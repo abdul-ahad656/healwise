@@ -1,0 +1,70 @@
+# from flask import request, jsonify
+# from app.services.symptom_service import process_and_store_symptom, fetch_symptom
+# from app.models.symptom_model import get_user_symptoms
+# from bson.objectid import ObjectId
+
+# def submit_symptoms():
+#     """
+#     POST /api/symptoms/submit
+#     body: { "userId": "<id>", "text": "<symptom text>", "language": "en" }
+#     """
+#     data = request.get_json(force=True)
+#     user_id = data.get("userId")
+#     text = data.get("text")
+#     language = data.get("language", "en")
+
+#     if not user_id or not text:
+#         return jsonify({"error": "userId and text are required"}), 400
+
+#     symptom_id = process_and_store_symptom(user_id, text, language)
+#     return jsonify({
+#         "success": True,
+#         "symptomId": symptom_id,
+#         "message": "Symptoms submitted; AI analysis running (synchronously)."
+#     }), 201
+
+# def get_symptom(symptom_id):
+#     doc = fetch_symptom(symptom_id)
+#     if not doc:
+#         return jsonify({"error": "not found"}), 404
+#     # ensure aiAnalysis present, or if still processing show status
+#     return jsonify(doc), 200
+
+# def history(user_id):
+#     docs = get_user_symptoms(user_id)
+#     # convert _id to str
+#     for d in docs:
+#         d["_id"] = str(d["_id"])
+#     return jsonify(docs), 200
+
+from flask import request, jsonify
+from flask_jwt_extended import get_jwt_identity
+from app.models.user_model import find_user_by_id
+from app.services.symptom_service import process_and_store_symptom
+
+def submit_symptoms():
+    user_id = get_jwt_identity()
+    data = request.get_json()
+
+    text = data.get("text")
+    if not text:
+        return jsonify({"error": "Symptoms text is required"}), 400
+
+    # Fetch user language
+    user = find_user_by_id(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    language = user.get("language", "en")
+
+    # 🔥 AI + Save in ONE step
+    result = process_and_store_symptom(
+        user_id=user_id,
+        text=text,
+        language=language
+    )
+
+    return jsonify({
+        "message": "Symptoms analyzed successfully",
+        "data": result
+    }), 200

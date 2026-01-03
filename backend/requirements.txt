@@ -1,0 +1,10 @@
+flask
+flask-cors
+flask-pymongo
+flask-jwt-extended
+python-dotenv
+transformers
+torch
+pandas
+numpy
+evaluate

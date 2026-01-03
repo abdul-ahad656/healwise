@@ -1,0 +1,81 @@
+# ----------------------------------------------------------------------
+# GLOBAL/OPERATING SYSTEM EXCLUSIONS
+# ----------------------------------------------------------------------
+.DS_Store
+.env
+.flaskenv
+.vscode/
+
+# ----------------------------------------------------------------------
+# PYTHON/FLASK BACKEND EXCLUSIONS
+# ----------------------------------------------------------------------
+
+# Virtual Environment
+# Python virtual environments are typically named 'venv', 'env', or similar
+# They should not be committed, as they are platform-specific and contain
+# binaries that can be re-created via 'pip install -r requirements.txt'.
+venv/
+env/
+.venv/
+.tox/
+
+# Compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+
+# Byte-code files
+*~
+*.swp
+*.bak
+
+# Distribution and packaging
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+
+# Database files (if using a local SQLite DB)
+*.sqlite
+*.db
+
+# ----------------------------------------------------------------------
+# JAVASCRIPT/REACT NATIVE FRONTEND EXCLUSIONS
+# ----------------------------------------------------------------------
+
+# Node.js dependencies
+# This is the directory created by 'npm install' or 'yarn install'
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Android-specific files
+# These are generated during the build process
+android/.gradle/
+android/app/build/
+android/build/
+android/.idea/
+
+# iOS/Xcode-specific files
+# These are generated during the build process
+ios/build/
+ios/Pods/
+ios/.xcode.env.local
+
+# Expo/React Native specific files (if applicable)
+.expo/
+web-build/
+app.json
+
+# Bundle output
+*.jsbundle
+.next/
+
+# Jest/Testing cache
+coverage/
+
+# Misc
+*.iml

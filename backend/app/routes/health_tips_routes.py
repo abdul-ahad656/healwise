@@ -1,0 +1,32 @@
+from flask import Blueprint
+from flask_jwt_extended import jwt_required
+from app.controllers.health_tips_controller import (
+    add_tip,
+    get_tips,
+    deactivate_tip
+)
+from app.utils.role_guard import admin_required
+
+health_tips_bp = Blueprint("health_tips_bp", __name__)
+
+# Admin → Add health tip
+@health_tips_bp.post("/")
+@jwt_required()
+def create_tip():
+    if not admin_required():
+        return {"error": "Admin only"}, 403
+    return add_tip()
+
+# Patient / All → View tips
+@health_tips_bp.get("/")
+@jwt_required()
+def view_tips():
+    return get_tips()
+
+# Admin → Deactivate tip
+@health_tips_bp.put("/<tip_id>/deactivate")
+@jwt_required()
+def disable_tip(tip_id):
+    if not admin_required():
+        return {"error": "Admin only"}, 403
+    return deactivate_tip(tip_id)
