@@ -14,6 +14,7 @@ from app.routes.admin_routes import admin_bp
 from app.routes.doctor_routes import doctor_bp
 from app.routes.doctor_profile_routes import doctor_profile_bp
 from app.routes.health_tips_routes import health_tips_bp
+from app.routes.medicine_type_routes import medicine_type_bp
 
 
 def create_app():
@@ -35,6 +36,7 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
     app.register_blueprint(doctor_profile_bp, url_prefix="/api/doctor_profile")
     app.register_blueprint(health_tips_bp,url_prefix="/api/health-tips")
+    app.register_blueprint(medicine_type_bp,url_prefix="/api/medicine-awareness")
 
 
 
