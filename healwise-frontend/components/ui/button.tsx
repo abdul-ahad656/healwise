@@ -206,7 +206,7 @@ export function Button({
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
-      style={({ pressed }) => [
+      style={({ pressed }: { pressed: boolean }) => [
         styles.base,
         variantStyles[variant],
         sizeStyles[size],

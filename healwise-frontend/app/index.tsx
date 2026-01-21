@@ -131,7 +131,7 @@ export default function SplashScreen() {
         {/* Bottom section */}
         <View style={styles.buttonContainer}>
           <Pressable onPress={handleContinue}>
-            {({ pressed }) => (
+            {({ pressed }: { pressed: boolean }) => (
               <LinearGradient
                 colors={pressed ? ["#16a34a", "#2563eb"] : ["#22c55e", "#3b82f6"]}
                 style={styles.button}

@@ -1,89 +1,177 @@
-import { StyleSheet, ScrollView, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  SafeAreaView,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { 
+  ChevronRight, 
+  Thermometer, 
+  Pill, 
+  Shield, 
+  BookOpen, 
+  Video 
+} from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Card } from '@/components/ui/card';
 
-export default function PatientHomeScreen() {
+export default function HomeDashboard() {
   const router = useRouter();
 
   const features = [
-    { name: 'Symptom Checker', route: '/(patient)/symptom-checker', icon: 'heart.fill' },
-    { name: 'AI Analysis', route: '/(patient)/ai-analysis', icon: 'sparkles' },
-    { name: 'Consult Doctor', route: '/(patient)/consult-doctor', icon: 'person.2.fill' },
-    { name: 'Appointments', route: '/(patient)/appointments', icon: 'calendar' },
-    { name: 'Medicine Compare', route: '/(patient)/medicine-compare', icon: 'pills.fill' }, // customized icon name if valid
-    { name: 'Medical Reports', route: '/(patient)/medical-reports', icon: 'doc.text.fill' },
-    { name: 'Health Tips', route: '/(patient)/health-tips', icon: 'leaf.fill' },
-    { name: 'Medicine Awareness', route: '/(patient)/medicine-awareness', icon: 'info.circle.fill' },
-    { name: 'Feedback', route: '/(patient)/feedback', icon: 'envelope.fill' },
+    {
+      icon: Thermometer,
+      title: 'Symptom Checker',
+      subtitle: 'علامات کی جانچ',
+      description: 'Check your symptoms with AI',
+      color: '#ef4444',
+      route: '/symptom-checker'
+    },
+    {
+      icon: Pill,
+      title: 'Medicine Comparison',
+      subtitle: 'دوا کا موازنہ',
+      description: 'Compare medicine prices',
+      color: '#3b82f6',
+      route: '/medicine-comparison'
+    },
+    {
+      icon: Shield,
+      title: 'Medicine Awareness',
+      subtitle: 'دوا کی آگاہی',
+      description: 'Check drug interactions',
+      color: '#f97316',
+      route: '/medicine-safety'
+    },
+    {
+      icon: BookOpen,
+      title: 'Health Education',
+      subtitle: 'صحت کی تعلیم',
+      description: 'Learn about health topics',
+      color: '#22c55e',
+      route: '/health-education'
+    },
+    {
+      icon: Video,
+      title: 'Doctor Consultation',
+      subtitle: 'ڈاکٹر سے مشورہ',
+      description: 'Talk to qualified doctors',
+      color: '#a855f7',
+      route: '/doctor-consultation'
+    }
   ];
 
   return (
-    <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <ThemedText type="title">Welcome, Patient</ThemedText>
-          <ThemedText style={styles.subtitle}>How can we help you today?</ThemedText>
-        </View>
+    <View style={styles.container}>
+      {/* Background Layer */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f9fafb' }]} />
 
+      {/* Header */}
+      <LinearGradient
+        colors={["#22c55e", "#3b82f6"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.header}
+      >
+        <SafeAreaView>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerTitle}>Welcome to HealWise</Text>
+              <Text style={styles.headerSubtitle}>HealWise میں خوش آمدید</Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.grid}>
           {features.map((feature, index) => (
-            <TouchableOpacity 
-              key={index} 
-              style={styles.card} 
+            <Pressable
+              key={index}
               onPress={() => router.push(feature.route as any)}
+              style={({ pressed }: { pressed: boolean }) => [
+                { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }
+              ]}
             >
-              {/* Note: Icon names might need adjustment based on available SF Symbols or mapping */}
-              <IconSymbol size={32} name={feature.icon as any} color="#0a7ea4" />
-              <ThemedText style={styles.cardText}>{feature.name}</ThemedText>
-            </TouchableOpacity>
+              <Card style={styles.featureCard}>
+                <View style={styles.cardInner}>
+                  <View style={[styles.iconBox, { backgroundColor: feature.color }]}>
+                    <feature.icon size={24} color="white" />
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text style={styles.featureTitle}>{feature.title}</Text>
+                    <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
+                    <Text style={styles.featureDesc}>{feature.description}</Text>
+                  </View>
+                  <ChevronRight size={20} color="#d1d5db" />
+                </View>
+              </Card>
+            </Pressable>
           ))}
         </View>
+
+        {/* Quick Stats Row */}
+        <View style={styles.statsRow}>
+          <Card style={[styles.statCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
+            <Text style={styles.statValue}>24/7</Text>
+            <Text style={styles.statLabel}>Available</Text>
+          </Card>
+          <Card style={[styles.statCard, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}>
+            <Text style={styles.statValue}>1000+</Text>
+            <Text style={styles.statLabel}>Doctors</Text>
+          </Card>
+        </View>
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingTop: 60,
-  },
+  container: { flex: 1 },
   header: {
-    marginBottom: 30,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
-  subtitle: {
-    marginTop: 5,
-    color: '#666',
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 15,
-    justifyContent: 'space-between',
-  },
-  card: {
-    width: '47%',
-    aspectRatio: 1,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    padding: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
+  headerContent: { marginTop: 20 },
+  headerTitle: { fontSize: 24, fontWeight: "700", color: "#FFFFFF" },
+  headerSubtitle: { fontSize: 16, color: "#FFFFFF", opacity: 0.9 },
+  scrollView: { flex: 1, marginTop: -20 },
+  scrollContent: { paddingHorizontal: 24, paddingBottom: 40 },
+  grid: { gap: 16 },
+  featureCard: {
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 0,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
   },
-  cardText: {
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '600',
+  cardInner: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  iconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  textContainer: { flex: 1 },
+  featureTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 2 },
+  featureSubtitle: { fontSize: 14, color: '#4b5563', marginBottom: 2 },
+  featureDesc: { fontSize: 12, color: '#9ca3af' },
+  statsRow: { flexDirection: 'row', gap: 16, marginTop: 24 },
+  statCard: { flex: 1, padding: 16, alignItems: 'center' },
+  statValue: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  statLabel: { fontSize: 12, color: '#6b7280' },
 });

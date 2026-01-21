@@ -567,7 +567,7 @@ export default function LoginScreen() {
             <Pressable
               onPress={handleLogin}
               disabled={!email || !password}
-              style={({ pressed }) => [
+              style={({ pressed }: { pressed: boolean }) => [
                 styles.loginButtonWrapper,
                 (!email || !password) && { opacity: 0.6 },
                 pressed && { opacity: 0.9 }

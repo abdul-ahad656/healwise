@@ -86,7 +86,7 @@ export default function SymptomChecker() {
           <Pressable
             onPress={handleCheck}
             disabled={!symptoms.trim()}
-            style={({ pressed }) => [
+            style={({ pressed }: { pressed: boolean }) => [
               styles.checkButtonWrapper,
               !symptoms.trim() && { opacity: 0.5 },
               pressed && { opacity: 0.9 }
