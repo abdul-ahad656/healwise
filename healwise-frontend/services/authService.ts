@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './config';
+import AuthStore from './authStore';
 
 export interface User {
   id?: string;
@@ -29,6 +30,10 @@ export const login = async (email: string, password: string): Promise<AuthRespon
       throw new Error(data.error || 'Login failed');
     }
 
+    // Save token and user to store
+    AuthStore.setToken(data.token);
+    AuthStore.setUser(data.user);
+
     return data;
   } catch (error: any) {
     throw new Error(error.message || 'Network error');
@@ -55,6 +60,10 @@ export const register = async (
     if (!response.ok) {
       throw new Error(data.error || 'Registration failed');
     }
+
+    // Save token and user to store
+    AuthStore.setToken(data.token);
+    AuthStore.setUser(data.user);
 
     return data;
   } catch (error: any) {

@@ -7,36 +7,47 @@ import {
   Pressable, 
   ScrollView, 
   SafeAreaView, 
-  Platform 
+  Alert,
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Mic, Search, AlertCircle, Circle } from 'lucide-react-native';
+import { ArrowLeft, Mic, Search } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Card } from '@/components/ui/card'; // Using your existing Card component
+import { Card } from '@/components/ui/card';
+import { analyzeSymptoms } from '@/services/symptomService';
 
 export default function SymptomChecker() {
   const router = useRouter();
   const [symptoms, setSymptoms] = useState('');
-  const [results, setResults] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleCheck = () => {
-    // Mock results for demo
-    setResults({
-      condition: 'Common Cold',
-      severity: 'Mild',
-      recommendations: [
-        'Rest and stay hydrated',
-        'Take over-the-counter pain relievers',
-        'Consult a doctor if symptoms worsen'
-      ]
-    });
+  const handleCheck = async () => {
+    if (!symptoms.trim()) return;
+
+    setLoading(true);
+    try {
+      const result = await analyzeSymptoms(symptoms);
+      
+      // Pass result to result page
+      // Note: expo-router params are strings. We need to stringify the object.
+      router.push({
+        pathname: "/(patient)/symptom-checker/result",
+        params: { data: JSON.stringify(result) }
+      });
+      
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <View style={styles.container}>
       {/* Background Gradient matching Theme */}
       <LinearGradient
-        colors={["#fef2f2", "#ffffff", "#fff7ed"]} // Light red to light orange tint
+        colors={["#fef2f2", "#ffffff", "#fff7ed"]}
         style={StyleSheet.absoluteFill}
       />
 
@@ -85,10 +96,10 @@ export default function SymptomChecker() {
 
           <Pressable
             onPress={handleCheck}
-            disabled={!symptoms.trim()}
+            disabled={!symptoms.trim() || loading}
             style={({ pressed }: { pressed: boolean }) => [
               styles.checkButtonWrapper,
-              !symptoms.trim() && { opacity: 0.5 },
+              (!symptoms.trim() || loading) && { opacity: 0.5 },
               pressed && { opacity: 0.9 }
             ]}
           >
@@ -98,59 +109,17 @@ export default function SymptomChecker() {
               end={{ x: 1, y: 0 }}
               style={styles.checkButton}
             >
-              <Search size={18} color="white" style={styles.buttonIcon} />
-              <Text style={styles.checkButtonText}>Check Symptoms</Text>
+              {loading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <>
+                  <Search size={20} color="white" />
+                  <Text style={styles.checkButtonText}>Analyze Symptoms</Text>
+                </>
+              )}
             </LinearGradient>
           </Pressable>
         </Card>
-
-        {/* Results Card */}
-        {results && (
-          <Card style={[styles.card, styles.resultsCard]}>
-            <View style={styles.resultsHeader}>
-              <AlertCircle size={20} color="#f97316" />
-              <Text style={styles.resultsTitle}>Analysis Results</Text>
-            </View>
-            
-            <View style={styles.resultItem}>
-              <Text style={styles.resultLabel}>Possible Condition</Text>
-              <Text style={styles.conditionText}>{results.condition}</Text>
-            </View>
-            
-            <View style={styles.resultItem}>
-              <Text style={styles.resultLabel}>Severity</Text>
-              <View style={[
-                styles.severityBadge,
-                results.severity === 'Mild' ? styles.bgGreen : 
-                results.severity === 'Moderate' ? styles.bgYellow : styles.bgRed
-              ]}>
-                <Text style={[
-                  styles.severityText,
-                  results.severity === 'Mild' ? styles.textGreen : 
-                  results.severity === 'Moderate' ? styles.textYellow : styles.textRed
-                ]}>
-                  {results.severity}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.resultItem}>
-              <Text style={styles.resultLabel}>Recommendations</Text>
-              {results.recommendations.map((rec: string, index: number) => (
-                <View key={index} style={styles.recItem}>
-                  <View style={styles.bullet} />
-                  <Text style={styles.recText}>{rec}</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.warningBox}>
-              <Text style={styles.warningText}>
-                ⚠️ This is AI analysis only. Please consult a qualified doctor for proper diagnosis.
-              </Text>
-            </View>
-          </Card>
-        )}
       </ScrollView>
     </View>
   );
@@ -161,170 +130,104 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+    paddingTop: Platform.OS === 'android' ? 40 : 0,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
   headerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    gap: 15,
   },
   backButton: {
-    padding: 8,
-    marginLeft: -8,
-    marginRight: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    fontWeight: 'bold',
+    color: 'white',
   },
   headerSubtitle: {
     fontSize: 14,
-    color: "#FFFFFF",
-    opacity: 0.9,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 2,
   },
   scrollView: {
     flex: 1,
     marginTop: -20,
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 40,
+    padding: 20,
   },
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 24,
-    elevation: 4,
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: 'white',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 12,
-    marginBottom: 20,
+    elevation: 5,
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#1f2937",
+    fontWeight: '600',
+    color: '#374151',
     marginBottom: 16,
-    textAlign: 'center'
   },
   inputContainer: {
-    flexDirection: 'row',
     backgroundColor: '#f9fafb',
     borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minHeight: 100,
-    alignItems: 'flex-start'
+    borderColor: '#e5e7eb',
+    minHeight: 120,
+    marginBottom: 20,
   },
   input: {
+    fontSize: 16,
+    color: '#1f2937',
+    textAlignVertical: 'top',
     flex: 1,
-    fontSize: 15,
-    color: '#111827',
-    paddingTop: 0,
-    textAlignVertical: 'top'
+    lineHeight: 24,
   },
   micButton: {
-    padding: 4,
-  },
-  checkButtonWrapper: {
-    marginTop: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  checkButton: {
-    flexDirection: 'row',
-    height: 52,
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f3f4f6',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonIcon: {
-    marginRight: 8,
+  checkButtonWrapper: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: "#ef4444",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  checkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
   },
   checkButtonText: {
     color: 'white',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  resultsCard: {
-    marginTop: 0,
-  },
-  resultsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    gap: 8,
-  },
-  resultsTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  resultItem: {
-    marginBottom: 16,
-  },
-  resultLabel: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginBottom: 4,
-  },
-  conditionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
   },
-  severityBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 99,
-  },
-  severityText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  recItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: 6,
-    gap: 8,
-  },
-  bullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#ef4444',
-    marginTop: 6,
-  },
-  recText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#4b5563',
-    lineHeight: 20,
-  },
-  warningBox: {
-    marginTop: 20,
-    padding: 12,
-    backgroundColor: '#fffbeb',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#fef3c7',
-  },
-  warningText: {
-    fontSize: 12,
-    color: '#92400e',
-    lineHeight: 18,
-  },
-  bgGreen: { backgroundColor: '#dcfce7' },
-  textGreen: { color: '#15803d' },
-  bgYellow: { backgroundColor: '#fef9c3' },
-  textYellow: { color: '#a16207' },
-  bgRed: { backgroundColor: '#fee2e2' },
-  textRed: { color: '#b91c1c' },
 });
