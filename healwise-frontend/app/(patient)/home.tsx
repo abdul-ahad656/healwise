@@ -37,7 +37,7 @@ export default function HomeDashboard() {
       subtitle: 'دوا کا موازنہ',
       description: 'Compare medicine prices',
       color: '#3b82f6',
-      route: '/medicine-comparison'
+      route: '/(patient)/medicine-compare'
     },
     {
       icon: Shield,
@@ -45,7 +45,7 @@ export default function HomeDashboard() {
       subtitle: 'دوا کی آگاہی',
       description: 'Check drug interactions',
       color: '#f97316',
-      route: '/medicine-safety'
+      route: '/(patient)/medicine-awareness'
     },
     {
       icon: BookOpen,
@@ -53,7 +53,7 @@ export default function HomeDashboard() {
       subtitle: 'صحت کی تعلیم',
       description: 'Learn about health topics',
       color: '#22c55e',
-      route: '/health-education'
+      route: '/(patient)/health-tips'
     },
     {
       icon: Video,
@@ -61,7 +61,7 @@ export default function HomeDashboard() {
       subtitle: 'ڈاکٹر سے مشورہ',
       description: 'Talk to qualified doctors',
       color: '#a855f7',
-      route: '/doctor-consultation'
+      route: '/consult-doctor'
     }
   ];
 

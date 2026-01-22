@@ -29,29 +29,40 @@ import {
   Pressable,
   ScrollView,
   SafeAreaView,
-  Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Search, DollarSign, Star, Info } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
+import { compareMedicines, CompareResult } from '@/services/medicineService';
 
 export default function MedicineComparison() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<CompareResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = () => {
-    // Mock results for demo
-    setResults({
-      salt: 'Paracetamol 500mg',
-      alternatives: [
-        { brand: 'Panadol', price: 'PKR 45', manufacturer: 'GSK', affordable: false },
-        { brand: 'Calpol', price: 'PKR 38', manufacturer: 'GSK', affordable: true },
-        { brand: 'Fever Free', price: 'PKR 22', manufacturer: 'Local', affordable: true },
-        { brand: 'Disprin', price: 'PKR 55', manufacturer: 'Reckitt', affordable: false }
-      ]
-    });
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) return;
+
+    setLoading(true);
+    setResults(null);
+    setError(null);
+    try {
+      const data = await compareMedicines(searchTerm);
+      setResults(data);
+    } catch (error: any) {
+      if (error.message.includes("not found")) {
+        setError("No medicine found / کوئی دوا نہیں ملی");
+      } else {
+        Alert.alert("Error", error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -104,10 +115,10 @@ export default function MedicineComparison() {
 
           <Pressable
             onPress={handleSearch}
-            disabled={!searchTerm.trim()}
+            disabled={!searchTerm.trim() || loading}
             style={({ pressed }: { pressed: boolean }) => [
               styles.buttonWrapper,
-              !searchTerm.trim() && { opacity: 0.5 },
+              (!searchTerm.trim() || loading) && { opacity: 0.5 },
               pressed && { opacity: 0.9 }
             ]}
           >
@@ -117,10 +128,21 @@ export default function MedicineComparison() {
               end={{ x: 1, y: 0 }}
               style={styles.searchButton}
             >
-              <Text style={styles.buttonText}>Compare Prices</Text>
+              {loading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.buttonText}>Compare Prices</Text>
+              )}
             </LinearGradient>
           </Pressable>
         </Card>
+
+        {error && (
+          <View style={styles.errorCard}>
+             <Info size={24} color="#ef4444" />
+             <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
 
         {results && (
           <View style={styles.resultsContainer}>
@@ -139,26 +161,30 @@ export default function MedicineComparison() {
             </View>
             
             {/* Alternatives List */}
-            {results.alternatives.map((med: any, index: number) => (
-              <Card key={index} style={[
-                styles.medCard,
-                med.affordable ? styles.affordableCard : styles.standardCard
-              ]}>
-                <View style={styles.medHeader}>
-                  <View style={styles.medBrandRow}>
-                    <Text style={styles.brandName}>{med.brand}</Text>
-                    {med.affordable && (
-                      <View style={styles.badge}>
-                        <Star size={10} color="white" fill="white" />
-                        <Text style={styles.badgeText}>Affordable</Text>
-                      </View>
-                    )}
+            {results.alternatives.map((med, index) => {
+              const isAffordable = index === 0; // First one is cheapest (sorted by backend)
+              return (
+                <Card key={index} style={[
+                  styles.medCard,
+                  isAffordable ? styles.affordableCard : styles.standardCard
+                ]}>
+                  <View style={styles.medHeader}>
+                    <View style={styles.medBrandRow}>
+                      <Text style={styles.brandName}>{med.name}</Text>
+                      {isAffordable && (
+                        <View style={styles.badge}>
+                          <Star size={10} color="white" fill="white" />
+                          <Text style={styles.badgeText}>Best Price</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.priceText}>PKR {med.price}</Text>
                   </View>
-                  <Text style={styles.priceText}>{med.price}</Text>
-                </View>
-                <Text style={styles.manufacturerText}>Manufacturer: {med.manufacturer}</Text>
-              </Card>
-            ))}
+                  <Text style={styles.manufacturerText}>Manufacturer: {med.manufacturer}</Text>
+                  <Text style={styles.manufacturerText}>Strength: {med.strength}</Text>
+                </Card>
+              );
+            })}
 
             {/* Savings Tip */}
             <View style={styles.tipCard}>
@@ -283,4 +309,20 @@ const styles = StyleSheet.create({
   tipContent: { flex: 1 },
   tipTitle: { fontSize: 15, fontWeight: '700', color: '#166534', marginBottom: 2 },
   tipText: { fontSize: 13, color: '#15803d', lineHeight: 18 },
+  errorCard: {
+    backgroundColor: '#fef2f2',
+    padding: 16,
+    borderRadius: 16,
+    marginTop: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#b91c1c',
+    fontWeight: '500',
+  },
 });
