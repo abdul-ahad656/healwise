@@ -131,6 +131,7 @@ def login_user(email, password):
     return {
         "token": access_token,
         "user": {
+            "id": str(user["_id"]),
             "name": user["name"],
             "email": user["email"],
             "language": user.get("language", "en"),
