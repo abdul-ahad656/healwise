@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { 
@@ -18,54 +19,87 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { getMedicineTypeAwareness, MedicineTypeAwareness } from '@/services/medicineService';
 
 export default function MedicineSafety() {
   const router = useRouter();
+  const [selectedType, setSelectedType] = useState<string>('antibiotic');
+  const [awareness, setAwareness] = useState<MedicineTypeAwareness | null>(null);
+  const [loadingAwareness, setLoadingAwareness] = useState(true);
+  const [awarenessError, setAwarenessError] = useState<string | null>(null);
 
-  const safetyTips = [
-    {
-      id: 1,
-      title: 'Drug Interaction Checker',
-      subtitle: 'دوائیوں کا تعامل چیک کریں',
-      icon: '⚠️',
-      category: 'Safety Check',
-      description: 'Check if your medications interact with each other',
-      importance: 'High'
-    },
-    {
-      id: 2,
-      title: 'Proper Dosage Guide',
-      subtitle: 'مناسب خوراک کی رہنمائی',
-      icon: '💊',
-      category: 'Dosage',
-      description: 'Learn the correct dosage for common medicines',
-      importance: 'High'
-    },
-    {
-      id: 3,
-      title: 'Storage Instructions',
-      subtitle: 'ذخیرہ کرنے کی ہدایات',
-      icon: '🌡️',
-      category: 'Storage',
-      description: 'How to properly store your medications',
-      importance: 'Medium'
-    }
-  ];
+  useEffect(() => {
+    const fetchAwareness = async () => {
+      setLoadingAwareness(true);
+      setAwarenessError(null);
+      try {
+        const data = await getMedicineTypeAwareness(selectedType);
+        setAwareness(data);
+      } catch (error: any) {
+        setAwareness(null);
+        setAwarenessError(error.message || 'Failed to load medicine awareness');
+      } finally {
+        setLoadingAwareness(false);
+      }
+    };
 
-  const commonWarnings = [
-    {
-      medicine: 'Antibiotics',
-      warning: 'Complete the full course',
-      risk: 'Medium',
-      details: 'Stopping early can lead to resistance'
-    },
-    {
-      medicine: 'Blood Pressure Meds',
-      warning: 'Take at the same time daily',
-      risk: 'High',
-      details: 'Irregular timing affects effectiveness'
+    fetchAwareness();
+  }, [selectedType]);
+
+  // const safetyTips = [
+  //   {
+  //     id: 1,
+  //     title: 'Drug Interaction Checker',
+  //     subtitle: 'دوائیوں کا تعامل چیک کریں',
+  //     icon: '⚠️',
+  //     category: 'Safety Check',
+  //     description: 'Check if your medications interact with each other',
+  //     importance: 'High'
+  //   },
+  //   {
+  //     id: 2,
+  //     title: 'Proper Dosage Guide',
+  //     subtitle: 'مناسب خوراک کی رہنمائی',
+  //     icon: '💊',
+  //     category: 'Dosage',
+  //     description: 'Learn the correct dosage for common medicines',
+  //     importance: 'High'
+  //   },
+  //   {
+  //     id: 3,
+  //     title: 'Storage Instructions',
+  //     subtitle: 'ذخیرہ کرنے کی ہدایات',
+  //     icon: '🌡️',
+  //     category: 'Storage',
+  //     description: 'How to properly store your medications',
+  //     importance: 'Medium'
+  //   }
+  // ];
+
+  // const commonWarnings = [
+  //   {
+  //     medicine: 'Antibiotics',
+  //     warning: 'Complete the full course',
+  //     risk: 'Medium',
+  //     details: 'Stopping early can lead to resistance'
+  //   },
+  //   {
+  //     medicine: 'Blood Pressure Meds',
+  //     warning: 'Take at the same time daily',
+  //     risk: 'High',
+  //     details: 'Irregular timing affects effectiveness'
+  //   }
+  // ];
+
+  const normalizeList = (value: string[] | string | undefined | null) => {
+    if (Array.isArray(value)) {
+      return value;
     }
-  ];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return [value];
+    }
+    return [];
+  };
 
   const safetyGuidelines = [
     'Always read the label before taking any medicine',
@@ -114,8 +148,90 @@ export default function MedicineSafety() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Important Warnings */}
+        {/* Medicine Type Awareness from Backend */}
         <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Shield size={20} color="#16a34a" />
+            <Text style={styles.sectionTitle}>Medicine Type Awareness</Text>
+          </View>
+          <View style={styles.typeChipsRow}>
+            {['Antibiotics', 'steroid', 'painkiller'].map((type) => (
+              <Pressable
+                key={type}
+                onPress={() => setSelectedType(type)}
+                style={[
+                  styles.typeChip,
+                  selectedType === type && styles.typeChipActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.typeChipText,
+                    selectedType === type && styles.typeChipTextActive,
+                  ]}
+                >
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {loadingAwareness ? (
+            <ActivityIndicator size="small" color="#16a34a" />
+          ) : awarenessError ? (
+            <Text style={styles.errorText}>{awarenessError}</Text>
+          ) : awareness ? (
+            <View style={{ gap: 12 }}>
+              <Card style={styles.awarenessCard}>
+                <Text style={styles.awarenessTitle}>{awareness.medicine_type}</Text>
+                <Text style={styles.awarenessDesc}>{awareness.description}</Text>
+              </Card>
+
+              <Card style={styles.awarenessCard}>
+                <Text style={styles.awarenessHeading}>Common Uses</Text>
+                {normalizeList(awareness.common_uses).map((item, idx) => (
+                  <Text key={idx} style={styles.awarenessItemText}>• {item}</Text>
+                ))}
+              </Card>
+
+              <Card style={styles.awarenessCard}>
+                <Text style={styles.awarenessHeading}>How to Use</Text>
+                {normalizeList(awareness.how_to_use).map((item, idx) => (
+                  <Text key={idx} style={styles.awarenessItemText}>• {item}</Text>
+                ))}
+              </Card>
+
+              <Card style={styles.awarenessCard}>
+                <Text style={styles.awarenessHeading}>Precautions</Text>
+                {normalizeList(awareness.precautions).map((item, idx) => (
+                  <Text key={idx} style={styles.awarenessItemText}>• {item}</Text>
+                ))}
+              </Card>
+
+              <Card style={styles.awarenessCard}>
+                <Text style={styles.awarenessHeading}>Side Effects</Text>
+                {normalizeList(awareness.side_effects).map((item, idx) => (
+                  <Text key={idx} style={styles.awarenessItemText}>• {item}</Text>
+                ))}
+              </Card>
+
+              <Card style={styles.awarenessCard}>
+                <Text style={styles.awarenessHeading}>Warnings</Text>
+                {normalizeList(awareness.warnings).map((item, idx) => (
+                  <Text key={idx} style={styles.awarenessItemText}>• {item}</Text>
+                ))}
+                <Text style={styles.awarenessOtc}>
+                  {awareness.otc ? 'Available over the counter (OTC)' : 'Prescription only'}
+                </Text>
+              </Card>
+
+              <Text style={styles.awarenessDisclaimer}>{awareness.disclaimer}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Important Warnings */}
+        {/* <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <AlertTriangle size={20} color="#f97316" />
             <Text style={styles.sectionTitle}>Important Warnings</Text>
@@ -141,10 +257,10 @@ export default function MedicineSafety() {
               </Card>
             ))}
           </View>
-        </View>
+        </View> */}
 
         {/* Safety Tips Cards */}
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Shield size={20} color="#3b82f6" />
             <Text style={styles.sectionTitle}>Safety Resources</Text>
@@ -170,7 +286,7 @@ export default function MedicineSafety() {
               </View>
             </Card>
           ))}
-        </View>
+        </View> */}
 
         {/* General Guidelines */}
         <Card style={styles.guidelinesCard}>
@@ -256,5 +372,29 @@ const styles = StyleSheet.create({
   emergencyTitle: { fontSize: 16, fontWeight: '700', color: '#991b1b' },
   emergencyDesc: { fontSize: 13, color: '#b91c1c' },
   emergencyNumber: { fontSize: 24, fontWeight: '800', color: '#991b1b', marginVertical: 4 },
-  emergencyUrdu: { fontSize: 12, color: '#ef4444' }
+  emergencyUrdu: { fontSize: 12, color: '#ef4444' },
+  typeChipsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  typeChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    backgroundColor: '#ffffff',
+  },
+  typeChipActive: {
+    backgroundColor: '#16a34a',
+    borderColor: '#16a34a',
+  },
+  typeChipText: { fontSize: 12, color: '#374151' },
+  typeChipTextActive: { color: '#ffffff', fontWeight: '600' },
+  awarenessCard: { padding: 14, backgroundColor: '#f0fdf4', borderRadius: 12, borderWidth: 1, borderColor: '#bbf7d0' },
+  awarenessTitle: { fontSize: 16, fontWeight: '700', color: '#14532d', marginBottom: 4, textTransform: 'capitalize' },
+  awarenessDesc: { fontSize: 13, color: '#166534' },
+  awarenessHeading: { fontSize: 14, fontWeight: '700', color: '#14532d', marginBottom: 4 },
+  awarenessItemText: { fontSize: 13, color: '#166534', marginBottom: 2 },
+  awarenessOtc: { fontSize: 12, color: '#15803d', marginTop: 6, fontStyle: 'italic' },
+  awarenessDisclaimer: { fontSize: 11, color: '#6b7280', marginTop: 8 },
+  errorText: { fontSize: 12, color: '#b91c1c' },
+  emptyText: { fontSize: 12, color: '#6b7280' },
 });
