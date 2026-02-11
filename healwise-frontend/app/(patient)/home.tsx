@@ -29,7 +29,7 @@ export default function HomeDashboard() {
       subtitle: 'علامات کی جانچ',
       description: 'Check your symptoms with AI',
       color: '#ef4444',
-      route: '/symptom-checker'
+      route: '/(patient)/symptom-checker'
     },
     {
       icon: Pill,

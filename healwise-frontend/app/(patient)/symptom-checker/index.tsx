@@ -12,7 +12,7 @@ import {
   Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Mic, Search } from 'lucide-react-native';
+import { ArrowLeft, Mic, Search, Info } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { analyzeSymptoms } from '@/services/symptomService';
@@ -21,11 +21,13 @@ export default function SymptomChecker() {
   const router = useRouter();
   const [symptoms, setSymptoms] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleCheck = async () => {
     if (!symptoms.trim()) return;
 
     setLoading(true);
+    setError(null);
     try {
       const result = await analyzeSymptoms(symptoms);
       
@@ -37,7 +39,7 @@ export default function SymptomChecker() {
       });
       
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      setError(error.message || "An error occurred / کوئی مسئلہ پیش آیا");
     } finally {
       setLoading(false);
     }
@@ -76,6 +78,13 @@ export default function SymptomChecker() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {error && (
+          <View style={styles.errorCard}>
+            <Info size={24} color="#ef4444" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
         {/* Input Card */}
         <Card style={styles.card}>
           <Text style={styles.cardTitle}>Describe Your Symptoms</Text>
@@ -205,29 +214,46 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   checkButtonWrapper: {
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: "#ef4444",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   checkButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    padding: 16,
     gap: 8,
   },
   checkButtonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: '600',
+    fontSize: 16,
+  },
+  errorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fee2e2',
+    marginBottom: 20,
+    gap: 12,
+  },
+  errorText: {
+    flex: 1,
+    color: '#ef4444',
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,6 +6,8 @@ import {
   Pressable,
   ScrollView,
   SafeAreaView,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { 
@@ -13,62 +15,46 @@ import {
   BookOpen, 
   Play, 
   Clock, 
-  Eye, 
   ChevronRight,
   Bell
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { getHealthTips, HealthTip } from '@/services/healthTipService';
 
 export default function HealthEducation() {
   const router = useRouter();
+  const [tips, setTips] = useState<HealthTip[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const educationContent = [
-    {
-      id: 1,
-      title: 'Diabetes Prevention',
-      subtitle: 'ذیابیطس سے بچاؤ',
-      type: 'Article',
-      duration: '5 min read',
-      category: 'Prevention',
-      image: '🍎',
-      description: 'Learn how to prevent diabetes through lifestyle changes'
-    },
-    {
-      id: 2,
-      title: 'Heart Health Tips',
-      subtitle: 'دل کی صحت کے نکات',
-      type: 'Video',
-      duration: '3 min watch',
-      category: 'Heart Health',
-      image: '❤️',
-      description: 'Simple exercises and diet tips for a healthy heart'
-    },
-    {
-      id: 3,
-      title: 'Mental Wellness',
-      subtitle: 'ذہنی صحت',
-      type: 'Guide',
-      duration: '8 min read',
-      category: 'Mental Health',
-      image: '🧠',
-      description: 'Managing stress and maintaining mental wellbeing'
-    }
-  ];
+  useEffect(() => {
+    fetchTips();
+  }, []);
 
-  const healthAlerts = [
-    {
-      title: 'Dengue Alert in Karachi',
-      urgency: 'High',
-      date: '2 days ago'
-    },
-    {
-      title: 'Free Blood Pressure Checkup',
-      urgency: 'Info',
-      date: '1 week ago'
+  const fetchTips = async () => {
+    try {
+      const data = await getHealthTips();
+      setTips(data);
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  // const healthAlerts = [
+  //   {
+  //     title: 'Dengue Alert in Karachi',
+  //     urgency: 'High',
+  //     date: '2 days ago'
+  //   },
+  //   {
+  //     title: 'Free Blood Pressure Checkup',
+  //     urgency: 'Info',
+  //     date: '1 week ago'
+  //   }
+  // ];
 
   return (
     <View style={styles.container}>
@@ -117,7 +103,7 @@ export default function HealthEducation() {
             <Text style={styles.sectionTitle}>Local Health Alerts</Text>
           </View>
           
-          <View style={{ gap: 10 }}>
+          {/* <View style={{ gap: 10 }}>
             {healthAlerts.map((alert, index) => (
               <Card key={index} style={[
                 styles.alertCard,
@@ -134,7 +120,7 @@ export default function HealthEducation() {
                 </View>
               </Card>
             ))}
-          </View>
+          </View> */}
         </View>
 
         {/* Learn Section */}
@@ -144,32 +130,39 @@ export default function HealthEducation() {
             <Text style={styles.sectionTitle}>Learn About Health</Text>
           </View>
 
-          {educationContent.map((content) => (
-            <Card key={content.id} style={styles.contentCard}>
+          {loading ? (
+            <ActivityIndicator size="large" color="#22c55e" />
+          ) : tips.length === 0 ? (
+             <Text style={styles.noTipsText}>No health tips available.</Text>
+          ) : (
+            tips.map((content) => (
+            <Card key={content._id} style={styles.contentCard}>
               <View style={styles.cardInner}>
                 <View style={styles.imageBox}>
-                  <Text style={{ fontSize: 24 }}>{content.image}</Text>
+                  <Text style={{ fontSize: 24 }}>{content.media?.image || '🩺'}</Text>
                 </View>
                 
                 <View style={{ flex: 1 }}>
                   <View style={styles.metaRow}>
                     <View style={styles.categoryBadge}>
-                      <Text style={styles.categoryText}>{content.category}</Text>
+                      <Text style={styles.categoryText}>{content.type === 'disease' ? 'Disease Info' : 'General'}</Text>
                     </View>
+                    {/* Placeholder for duration if available in future */}
                     <View style={styles.durationBox}>
-                      {content.type === 'Video' ? <Play size={10} color="#6b7280" /> : <Clock size={10} color="#6b7280" />}
-                      <Text style={styles.durationText}>{content.duration}</Text>
+                       <Clock size={10} color="#6b7280" />
+                       <Text style={styles.durationText}>Read now</Text>
                     </View>
                   </View>
                   
                   <Text style={styles.contentTitle}>{content.title}</Text>
-                  <Text style={styles.contentUrdu}>{content.subtitle}</Text>
+                  {/* Assuming backend might send subtitle/urdu in future or part of description */}
                   <Text style={styles.contentDesc} numberOfLines={2}>{content.description}</Text>
                 </View>
                 <ChevronRight size={18} color="#d1d5db" />
               </View>
             </Card>
-          ))}
+            ))
+          )}
           
           <Button variant="outline" title="Explore All Topics" style={{ marginTop: 8 }} />
         </View>
@@ -243,5 +236,6 @@ const styles = StyleSheet.create({
   tipIconBox: { width: 40, height: 40, backgroundColor: '#ffffff', borderRadius: 20, alignItems: 'center', justifyContent: 'center', elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4 },
   tipLabel: { fontSize: 15, fontWeight: '700', color: '#166534', marginBottom: 2 },
   tipText: { fontSize: 13, color: '#15803d', lineHeight: 18 },
-  tipUrdu: { fontSize: 11, color: '#10b981', marginTop: 4, opacity: 0.8 }
+  tipUrdu: { fontSize: 11, color: '#10b981', marginTop: 4, opacity: 0.8 },
+  noTipsText: { fontSize: 14, color: '#6b7280', textAlign: 'center', marginTop: 8 }
 });
