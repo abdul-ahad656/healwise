@@ -102,61 +102,76 @@ export default function DoctorConsultation() {
           ) : doctors.length === 0 ? (
             <Text style={styles.emptyText}>No doctors found.</Text>
           ) : doctors.map((doctor) => (
-            <Card key={doctor.id} style={styles.doctorCard}>
-              <View style={styles.doctorInfoRow}>
-                {/* Placeholder avatar; backend does not provide image */}
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarInitial}>
-                    {doctor.name?.charAt(0) || 'D'}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.nameRow}>
-                    <View>
-                      <Text style={styles.doctorName}>{doctor.name}</Text>
+            <Pressable
+              key={doctor.id}
+              onPress={() =>
+                router.push({
+                  pathname: '/(patient)/consult-doctor/booking',
+                  params: { doctorId: doctor.id, doctorName: doctor.name },
+                })
+              }
+              style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Card style={styles.doctorCard}>
+                <View style={styles.doctorInfoRow}>
+                  {/* Placeholder avatar; backend does not provide image */}
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarInitial}>
+                      {doctor.name?.charAt(0) || 'D'}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.nameRow}>
+                      <View>
+                        <Text style={styles.doctorName}>{doctor.name}</Text>
+                      </View>
+                      <View style={styles.feeColumn}>
+                        <Text style={styles.feeText}>
+                          {doctor.consultationFee
+                            ? `PKR ${doctor.consultationFee}`
+                            : 'Fee not set'}
+                        </Text>
+                        <View style={styles.ratingRow}>
+                          <Star size={12} color="#eab308" fill="#eab308" />
+                          <Text style={styles.ratingText}>{doctor.rating}</Text>
+                        </View>
+                      </View>
                     </View>
-                    <View style={styles.feeColumn}>
-                      <Text style={styles.feeText}>
-                        {doctor.consultationFee ? `PKR ${doctor.consultationFee}` : 'Fee not set'}
+                    
+                    <Text style={styles.specialtyText}>{doctor.specialization || 'Doctor'}</Text>
+                    {doctor.hospital && (
+                      <Text style={styles.specialtyUrdu}>{doctor.hospital}</Text>
+                    )}
+                    
+                    <View style={styles.experienceRow}>
+                      <Text style={styles.expText}>
+                        {doctor.experience
+                          ? `${doctor.experience} exp.`
+                          : 'Experience not specified'}
                       </Text>
-                      <View style={styles.ratingRow}>
-                        <Star size={12} color="#eab308" fill="#eab308" />
-                        <Text style={styles.ratingText}>{doctor.rating}</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: '#f3f4f6' }]}>
+                        <Clock size={10} color="#6b7280" />
+                        <Text style={[styles.statusText, { color: '#4b5563' }]}>
+                          Online consultation
+                        </Text>
                       </View>
                     </View>
                   </View>
-                  
-                  <Text style={styles.specialtyText}>{doctor.specialization || 'Doctor'}</Text>
-                  {doctor.hospital && (
-                    <Text style={styles.specialtyUrdu}>{doctor.hospital}</Text>
-                  )}
-                  
-                  <View style={styles.experienceRow}>
-                    <Text style={styles.expText}>
-                      {doctor.experience ? `${doctor.experience} exp.` : 'Experience not specified'}
-                    </Text>
-                    <View style={[styles.statusBadge, { backgroundColor: '#f3f4f6' }]}>
-                      <Clock size={10} color="#6b7280" />
-                      <Text style={[styles.statusText, { color: '#4b5563' }]}>
-                        Online consultation
-                      </Text>
-                    </View>
-                  </View>
                 </View>
-              </View>
 
-              <View style={styles.actionButtons}>
-                <Button 
-                  title="Video Call" 
-                  style={styles.videoBtn}
-                />
-                <Button 
-                  title="Chat" 
-                  variant="outline" 
-                  style={styles.chatBtn}
-                />
-              </View>
-            </Card>
+                <View style={styles.actionButtons}>
+                  <Button 
+                    title="View Slots" 
+                    style={styles.videoBtn}
+                  />
+                  <Button 
+                    title="Chat" 
+                    variant="outline" 
+                    style={styles.chatBtn}
+                  />
+                </View>
+              </Card>
+            </Pressable>
           ))}
         </View>
 

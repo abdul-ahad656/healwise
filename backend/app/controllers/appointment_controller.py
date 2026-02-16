@@ -17,6 +17,7 @@ def book_appointment():
     # 🔴 1. CHECK DOCTOR SLOT EXISTS
     slot_exists = mongo.db.doctor_availability.find_one({
         "doctorId": doctor_id,
+        "day": date,
         "slots": time
     })
 
