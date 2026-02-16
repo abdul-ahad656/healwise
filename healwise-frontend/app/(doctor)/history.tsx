@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, Pressable } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, Pressable, SafeAreaView } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { ArrowLeft } from 'lucide-react-native';
+import { Card } from '@/components/ui/card';
 import {
   getDoctorAppointments,
   updateAppointmentStatus,
@@ -7,6 +11,7 @@ import {
 } from '@/services/doctorPanelService';
 
 export default function HistoryScreen() {
+  const router = useRouter();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +45,33 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Appointments</Text>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f9fafb' }]} />
+
+      <LinearGradient
+        colors={['#1d4ed8', '#22c55e']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.header}
+      >
+        <SafeAreaView>
+          <View style={styles.headerContent}>
+            <Pressable
+              onPress={() => router.back()}
+              style={({ pressed }) => [
+                styles.backButton,
+                { opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <ArrowLeft size={20} color="#ffffff" />
+            </Pressable>
+            <View>
+              <Text style={styles.headerTitle}>Appointments</Text>
+              <Text style={styles.headerSubtitle}>Manage and update appointment status</Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -54,7 +85,7 @@ export default function HistoryScreen() {
           <Text style={styles.infoText}>No appointments yet.</Text>
         ) : (
           appointments.map((a) => (
-            <View key={a._id} style={styles.appointmentCard}>
+            <Card key={a._id} style={styles.appointmentCard}>
               <Text style={styles.appointmentTitle}>
                 {a.appointmentDate} · {a.appointmentTime}
               </Text>
@@ -89,7 +120,7 @@ export default function HistoryScreen() {
                   </Pressable>
                 </View>
               )}
-            </View>
+            </Card>
           ))
         )}
       </ScrollView>
@@ -100,28 +131,47 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
-    paddingTop: 40,
-    paddingHorizontal: 16,
   },
-  title: {
-    fontSize: 24,
+  header: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  },
+  headerContent: {
+    marginTop: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  backButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 22,
     fontWeight: '700',
-    color: '#111827',
-    marginBottom: 8,
+    color: '#ffffff',
   },
-  scroll: { flex: 1, marginTop: 12 },
-  scrollContent: { paddingBottom: 32 },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#ffffff',
+    opacity: 0.9,
+  },
+  scroll: { flex: 1, marginTop: -16 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 32 },
   infoText: { fontSize: 13, color: '#6b7280', marginTop: 12 },
   errorText: { fontSize: 13, color: '#b91c1c', marginTop: 12 },
   appointmentCard: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 16,
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
   },
   appointmentTitle: { fontSize: 14, fontWeight: '600', color: '#111827' },
   appointmentMeta: { fontSize: 12, color: '#4b5563', marginTop: 2 },

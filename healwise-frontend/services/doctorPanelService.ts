@@ -136,3 +136,21 @@ export const setMyAvailability = async (
   }
 };
 
+export const deleteMyAvailabilityDay = async (day: string): Promise<void> => {
+  const headers = getAuthHeaders();
+
+  const response = await fetch(
+    `${API_BASE_URL}/availability/day/${encodeURIComponent(day)}`,
+    {
+      method: 'DELETE',
+      headers,
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to delete availability day');
+  }
+};
+

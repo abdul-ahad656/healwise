@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -13,6 +13,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { getDoctorAvailability, DoctorAvailabilityDay } from '@/services/doctorService';
+
+const formatDayLabel = (day: string) => {
+  const date = new Date(day);
+  if (Number.isNaN(date.getTime())) return day;
+  const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+  return `${weekday} ${day}`;
+};
 
 export default function DoctorBooking() {
   const router = useRouter();
@@ -50,7 +57,10 @@ export default function DoctorBooking() {
     fetchAvailability();
   }, [doctorId]);
 
-  const selectedDayData = availability.find((a) => a.day === selectedDay);
+  const selectedDayData = useMemo(
+    () => availability.find((a) => a.day === selectedDay),
+    [availability, selectedDay]
+  );
 
   return (
     <View style={styles.container}>
@@ -108,7 +118,7 @@ export default function DoctorBooking() {
                       selectedDay === day.day && styles.dayChipTextActive,
                     ]}
                   >
-                    {day.day}
+                    {formatDayLabel(day.day)}
                   </Text>
                 </Pressable>
               ))}
@@ -120,7 +130,7 @@ export default function DoctorBooking() {
                 <View style={styles.slotsHeader}>
                   <Clock size={14} color="#4b5563" />
                   <Text style={styles.slotsHeaderText}>
-                    {selectedDayData.day}
+                    {formatDayLabel(selectedDayData.day)}
                   </Text>
                 </View>
                 <View style={styles.slotsGrid}>

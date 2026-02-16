@@ -9,6 +9,7 @@ export default function DoctorLayout() {
       <Stack.Screen name="teleconsult" />
       <Stack.Screen name="upload-prescription" />
       <Stack.Screen name="history" />
+      <Stack.Screen name="profile" />
     </Stack>
   );
 }

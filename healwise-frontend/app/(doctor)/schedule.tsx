@@ -6,14 +6,27 @@ import {
   ScrollView,
   Pressable,
   TextInput,
+  SafeAreaView,
 } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ArrowLeft } from 'lucide-react-native';
 import {
   getMyAvailability,
   setMyAvailability,
+  deleteMyAvailabilityDay,
   DoctorAvailabilityDay,
 } from '@/services/doctorPanelService';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const formatDayLabel = (day: string) => {
+  const date = new Date(day);
+  if (Number.isNaN(date.getTime())) return day;
+  const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+  return `${weekday} ${day}`;
+};
 
 export default function DoctorSchedule() {
+  const router = useRouter();
   const [availability, setAvailability] = useState<DoctorAvailabilityDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +41,6 @@ export default function DoctorSchedule() {
     setLoading(true);
     try {
       const data = await getMyAvailability();
-      // sort days for stable UI
       const sorted = [...data].sort((a, b) => a.day.localeCompare(b.day));
       setAvailability(sorted);
       setSelectedDay(sorted[0]?.day ?? null);
@@ -101,12 +113,50 @@ export default function DoctorSchedule() {
     }
   };
 
+  const deleteSelectedDay = async () => {
+    if (!selectedDay) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await deleteMyAvailabilityDay(selectedDay);
+      await refresh();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete day');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Manage Schedule</Text>
-      <Text style={styles.subtitle}>
-        Set your available days and time slots. Patients will see these when booking.
-      </Text>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f9fafb' }]} />
+
+      <LinearGradient
+        colors={['#1d4ed8', '#22c55e']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.header}
+      >
+        <SafeAreaView>
+          <View style={styles.headerContent}>
+            <Pressable
+              onPress={() => router.back()}
+              style={({ pressed }) => [
+                styles.backButton,
+                { opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <ArrowLeft size={20} color="#ffffff" />
+            </Pressable>
+            <View>
+              <Text style={styles.headerTitle}>Manage Schedule</Text>
+              <Text style={styles.headerSubtitle}>
+                Set days and time ranges patients can book
+              </Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
 
       <ScrollView
         style={styles.scroll}
@@ -162,7 +212,7 @@ export default function DoctorSchedule() {
                       selectedDay === d.day && styles.chipTextActive,
                     ]}
                   >
-                    {d.day}
+                    {formatDayLabel(d.day)}
                   </Text>
                 </Pressable>
               ))}
@@ -180,7 +230,7 @@ export default function DoctorSchedule() {
                 <TextInput
                   value={slotInput}
                   onChangeText={setSlotInput}
-                  placeholder="HH:MM (e.g. 10:30)"
+                  placeholder="HH:MM - HH:MM (e.g. 10:30 - 13:00)"
                   placeholderTextColor="#9ca3af"
                   style={styles.input}
                 />
@@ -230,6 +280,17 @@ export default function DoctorSchedule() {
                   {saving ? 'Saving...' : 'Save Selected Day'}
                 </Text>
               </Pressable>
+
+              <Pressable
+                onPress={deleteSelectedDay}
+                disabled={saving}
+                style={({ pressed }) => [
+                  styles.deleteBtn,
+                  { opacity: saving ? 0.6 : pressed ? 0.85 : 1 },
+                ]}
+              >
+                <Text style={styles.deleteBtnText}>Delete Day</Text>
+              </Pressable>
             </>
           )}
         </View>
@@ -241,19 +302,40 @@ export default function DoctorSchedule() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
-    paddingTop: 40,
-    paddingHorizontal: 16,
   },
-  title: {
-    fontSize: 24,
+  header: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  },
+  headerContent: {
+    marginTop: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  backButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 22,
     fontWeight: '700',
-    color: '#111827',
-    marginBottom: 6,
+    color: '#ffffff',
   },
-  subtitle: { fontSize: 13, color: '#6b7280', marginBottom: 12 },
-  scroll: { flex: 1 },
-  scrollContent: { paddingBottom: 32 },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#ffffff',
+    opacity: 0.9,
+  },
+  scroll: { flex: 1, marginTop: -16 },
+  scrollContent: { paddingBottom: 32, paddingHorizontal: 20 },
   infoText: { fontSize: 13, color: '#6b7280', marginTop: 8 },
   errorText: { fontSize: 13, color: '#b91c1c', marginTop: 8 },
   card: {
@@ -322,5 +404,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+  deleteBtn: {
+    marginTop: 8,
+    backgroundColor: '#b91c1c',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  deleteBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
 });
 
