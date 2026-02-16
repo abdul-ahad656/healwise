@@ -128,7 +128,12 @@ export default function SymptomResult() {
         {/* Actions */}
         <Pressable 
           style={styles.consultButton}
-          onPress={() => router.push("/(patient)/consult-doctor")}
+          onPress={() =>
+            router.push({
+              pathname: "/(patient)/consult-doctor",
+              params: { symptomId: result?.symptomId },
+            })
+          }
         >
           <Text style={styles.consultButtonText}>Consult a Doctor Now</Text>
         </Pressable>

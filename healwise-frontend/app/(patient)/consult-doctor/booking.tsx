@@ -12,7 +12,11 @@ import { ArrowLeft, Clock } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { getDoctorAvailability, DoctorAvailabilityDay } from '@/services/doctorService';
+import {
+  getDoctorAvailability,
+  DoctorAvailabilityDay,
+  bookAppointment,
+} from '@/services/doctorService';
 
 const formatDayLabel = (day: string) => {
   const date = new Date(day);
@@ -23,15 +27,19 @@ const formatDayLabel = (day: string) => {
 
 export default function DoctorBooking() {
   const router = useRouter();
-  const { doctorId, doctorName } = useLocalSearchParams<{
+  const { doctorId, doctorName, symptomId } = useLocalSearchParams<{
     doctorId?: string;
     doctorName?: string;
+    symptomId?: string;
   }>();
 
   const [availability, setAvailability] = useState<DoctorAvailabilityDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [booking, setBooking] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!doctorId) {
@@ -61,6 +69,33 @@ export default function DoctorBooking() {
     () => availability.find((a) => a.day === selectedDay),
     [availability, selectedDay]
   );
+
+  const handleBook = async () => {
+    if (!doctorId || !selectedDay || !selectedSlot) {
+      setError('Please select a day and time slot');
+      return;
+    }
+
+    setError(null);
+    setSuccessMessage(null);
+    setBooking(true);
+    try {
+      await bookAppointment(
+        doctorId as string,
+        selectedDay,
+        selectedSlot,
+        symptomId as string | undefined
+      );
+      setSuccessMessage('Appointment booked successfully');
+      setTimeout(() => {
+        router.back();
+      }, 800);
+    } catch (err: any) {
+      setError(err.message || 'Failed to book appointment');
+    } finally {
+      setBooking(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -135,12 +170,34 @@ export default function DoctorBooking() {
                 </View>
                 <View style={styles.slotsGrid}>
                   {selectedDayData.slots.map((slot) => (
-                    <View key={slot} style={styles.slotChip}>
-                      <Text style={styles.slotChipText}>{slot}</Text>
-                    </View>
+                    <Pressable
+                      key={slot}
+                      onPress={() => setSelectedSlot(slot)}
+                      style={[
+                        styles.slotChip,
+                        selectedSlot === slot && styles.slotChipActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.slotChipText,
+                          selectedSlot === slot && styles.slotChipTextActive,
+                        ]}
+                      >
+                        {slot}
+                      </Text>
+                    </Pressable>
                   ))}
                 </View>
-                {/* Booking action will be wired next: selecting a slot & POST /appointments/book */}
+                <Button
+                  title={booking ? 'Booking...' : 'Book Appointment'}
+                  onPress={handleBook}
+                  disabled={!selectedSlot || booking}
+                  style={styles.bookButton}
+                />
+                {successMessage && (
+                  <Text style={styles.successText}>{successMessage}</Text>
+                )}
               </Card>
             ) : (
               <Text style={styles.infoText}>
@@ -210,6 +267,19 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#eef2ff',
   },
+  slotChipActive: {
+    backgroundColor: '#a855f7',
+  },
   slotChipText: { fontSize: 12, color: '#3730a3', fontWeight: '600' },
+  slotChipTextActive: { color: '#ffffff' },
+  bookButton: {
+    marginTop: 16,
+    borderRadius: 999,
+  },
+  successText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#15803d',
+  },
 });
 

@@ -19,6 +19,43 @@ export interface DoctorAvailabilityDay {
   slots: string[];
 }
 
+export const bookAppointment = async (
+  doctorId: string,
+  date: string,
+  time: string,
+  symptomId?: string
+): Promise<void> => {
+  const token = AuthStore.getToken();
+
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/appointments/book`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        doctorId,
+        date,
+        time,
+        symptomId,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to book appointment');
+    }
+  } catch (error: any) {
+    throw new Error(error.message || 'Network error');
+  }
+};
+
 export const getPublicDoctors = async (): Promise<Doctor[]> => {
   try {
     const response = await fetch(`${API_BASE_URL}/public/doctors`);

@@ -39,7 +39,10 @@
 
 from flask import request, jsonify
 from flask_jwt_extended import get_jwt_identity
+from bson.objectid import ObjectId
+from app.extensions import mongo
 from app.models.user_model import find_user_by_id
+from app.models.symptom_model import get_user_symptoms
 from app.services.symptom_service import process_and_store_symptom
 
 def submit_symptoms():
@@ -68,3 +71,28 @@ def submit_symptoms():
         "message": "Symptoms analyzed successfully",
         "data": result
     }), 200
+
+
+def get_patient_history_for_appointment(appointment_id: str):
+    doctor_id = get_jwt_identity()
+
+    appointment = mongo.db.appointments.find_one(
+        {"_id": ObjectId(appointment_id)}
+    )
+
+    if not appointment:
+        return jsonify({"error": "Appointment not found"}), 404
+
+    if str(appointment.get("doctorId")) != str(doctor_id):
+        return jsonify({"error": "Not allowed"}), 403
+
+    patient_id = appointment.get("patientId")
+    if not patient_id:
+        return jsonify({"error": "Patient not found"}), 404
+
+    history = get_user_symptoms(patient_id)
+
+    for item in history:
+        item["_id"] = str(item["_id"])
+
+    return jsonify(history), 200

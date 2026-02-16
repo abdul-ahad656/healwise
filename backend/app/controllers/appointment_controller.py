@@ -3,6 +3,7 @@ from flask_jwt_extended import get_jwt_identity
 from app.extensions import mongo
 from bson.objectid import ObjectId
 from datetime import datetime
+from app.models.user_model import find_user_by_id
 
 
 def book_appointment():
@@ -77,6 +78,9 @@ def doctor_appointments():
 
     for a in appointments:
         a["_id"] = str(a["_id"])
+        patient = find_user_by_id(a.get("patientId"))
+        if patient:
+            a["patientName"] = patient.get("name") or patient.get("email")
 
     return jsonify(appointments), 200
 

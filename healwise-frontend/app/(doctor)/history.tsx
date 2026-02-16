@@ -7,7 +7,9 @@ import { Card } from '@/components/ui/card';
 import {
   getDoctorAppointments,
   updateAppointmentStatus,
+  getSymptomHistoryForAppointment,
   Appointment,
+  SymptomHistoryItem,
 } from '@/services/doctorPanelService';
 
 export default function HistoryScreen() {
@@ -15,6 +17,8 @@ export default function HistoryScreen() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [symptomHistory, setSymptomHistory] = useState<Record<string, SymptomHistoryItem[]>>({});
+  const [symptomLoadingId, setSymptomLoadingId] = useState<string | null>(null);
 
   const refresh = async () => {
     try {
@@ -40,6 +44,25 @@ export default function HistoryScreen() {
       await refresh();
     } catch (err: any) {
       setError(err.message || 'Failed to update appointment');
+    }
+  };
+
+  const handleViewSymptoms = async (appointmentId: string) => {
+    if (symptomHistory[appointmentId]) {
+      const updated = { ...symptomHistory };
+      delete updated[appointmentId];
+      setSymptomHistory(updated);
+      return;
+    }
+
+    setSymptomLoadingId(appointmentId);
+    try {
+      const history = await getSymptomHistoryForAppointment(appointmentId);
+      setSymptomHistory((prev) => ({ ...prev, [appointmentId]: history }));
+    } catch (err: any) {
+      setError(err.message || 'Failed to load symptom history');
+    } finally {
+      setSymptomLoadingId(null);
     }
   };
 
@@ -90,9 +113,35 @@ export default function HistoryScreen() {
                 {a.appointmentDate} · {a.appointmentTime}
               </Text>
               <Text style={styles.appointmentMeta}>
-                Patient: {a.patientId}
+                Patient: {a.patientName || a.patientId}
               </Text>
               <Text style={styles.appointmentMeta}>Status: {a.status}</Text>
+
+              <Pressable
+                style={styles.symptomButton}
+                onPress={() => handleViewSymptoms(a._id)}
+              >
+                <Text style={styles.symptomButtonText}>
+                  {symptomHistory[a._id]
+                    ? 'Hide symptom history'
+                    : symptomLoadingId === a._id
+                    ? 'Loading symptoms...'
+                    : 'View symptom history'}
+                </Text>
+              </Pressable>
+
+              {symptomHistory[a._id] && symptomHistory[a._id].length > 0 && (
+                <View style={styles.symptomHistoryBox}>
+                  {symptomHistory[a._id].map((item) => (
+                    <View key={item._id} style={styles.symptomItem}>
+                      <Text style={styles.symptomPrimary}>
+                        {item.aiPrediction} ({Math.round(item.confidence * 100)}%)
+                      </Text>
+                      <Text style={styles.symptomText}>{item.text}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
 
               {a.status === 'pending' && (
                 <View style={styles.actionsRow}>
@@ -190,4 +239,34 @@ const styles = StyleSheet.create({
   rejectBtn: { backgroundColor: '#ef4444' },
   completeBtn: { backgroundColor: '#3b82f6' },
   actionText: { fontSize: 12, color: '#ffffff', fontWeight: '600' },
+  symptomButton: {
+    marginTop: 8,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#e5e7eb',
+    alignItems: 'center',
+  },
+  symptomButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  symptomHistoryBox: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: '#f9fafb',
+  },
+  symptomItem: {
+    marginBottom: 6,
+  },
+  symptomPrimary: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  symptomText: {
+    fontSize: 12,
+    color: '#4b5563',
+  },
 });

@@ -9,7 +9,7 @@ import {
   Image,
   Linking,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { 
   ArrowLeft, 
   Video, 
@@ -26,6 +26,9 @@ import { getPublicDoctors, Doctor } from '@/services/doctorService';
 
 export default function DoctorConsultation() {
   const router = useRouter();
+
+  const params = useLocalSearchParams<{ symptomId?: string }>();
+  const symptomId = params.symptomId as string | undefined;
 
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,7 +110,11 @@ export default function DoctorConsultation() {
               onPress={() =>
                 router.push({
                   pathname: '/(patient)/consult-doctor/booking',
-                  params: { doctorId: doctor.id, doctorName: doctor.name },
+                  params: {
+                    doctorId: doctor.id,
+                    doctorName: doctor.name,
+                    symptomId,
+                  },
                 })
               }
               style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}

@@ -14,9 +14,19 @@ export interface Appointment {
   patientId: string;
   doctorId: string;
   symptomId?: string;
+  patientName?: string;
   appointmentDate: string;
   appointmentTime: string;
   status: 'pending' | 'accepted' | 'rejected' | 'completed';
+}
+
+export interface SymptomHistoryItem {
+  _id: string;
+  text: string;
+  language: string;
+  aiPrediction: string;
+  confidence: number;
+  createdAt?: string;
 }
 
 export interface DoctorAvailabilityDay {
@@ -152,5 +162,27 @@ export const deleteMyAvailabilityDay = async (day: string): Promise<void> => {
   if (!response.ok) {
     throw new Error(data.error || 'Failed to delete availability day');
   }
+};
+
+export const getSymptomHistoryForAppointment = async (
+  appointmentId: string
+): Promise<SymptomHistoryItem[]> => {
+  const headers = getAuthHeaders();
+
+  const response = await fetch(
+    `${API_BASE_URL}/symptoms/history/appointment/${appointmentId}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to load symptom history');
+  }
+
+  return data;
 };
 
