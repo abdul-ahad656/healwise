@@ -1,181 +1,7 @@
-// import { useRouter } from "expo-router";
-// import { ArrowLeft, User, Mail, Lock, Eye, EyeOff } from "lucide-react-native";
-// import { useState } from "react";
-// import { Pressable, ScrollView, Text, View, Alert } from "react-native";
-
-// import { Button } from "@/components/ui/button";
-// import { Card } from "@/components/ui/card";
-// import { Input } from "@/components/ui/input";
-// import { register } from "@/services/authService";
-
-// export default function RegisterScreen() {
-//   const router = useRouter();
-
-//   const [form, setForm] = useState({
-//     name: "",
-//     email: "",
-//     password: "",
-//     confirmPassword: "",
-//   });
-
-//   const [showPassword, setShowPassword] = useState(false);
-//   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-//   const [loading, setLoading] = useState(false);
-
-//   const isFormValid =
-//     form.name &&
-//     form.email &&
-//     form.password.length >= 6 &&
-//     form.password === form.confirmPassword;
-
-//   const handleRegister = async () => {
-//     if (!isFormValid) return;
-
-//     setLoading(true);
-//     try {
-//       // Defaulting role to 'patient'
-//       const data = await register(form.name, form.email, form.password, 'patient');
-//       // TODO: Store token securely if needed for auto-login persistence
-//       // await SecureStore.setItemAsync('token', data.token);
-
-//       Alert.alert("Success", "Account created successfully!", [
-//         { text: "OK", onPress: () => router.replace("/(patient)/home") }
-//       ]);
-      
-//     } catch (error: any) {
-//       Alert.alert("Registration Failed", error.message);
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   return (
-//     <View className="flex-1 bg-gray-50">
-//       {/* Header */}
-//       <View className="bg-gradient-to-r from-green-500 to-blue-500 px-6 pt-14 pb-6 rounded-b-3xl">
-//         <View className="flex-row items-center gap-3 mb-2">
-//           <Pressable onPress={() => router.back()}>
-//             <ArrowLeft size={22} color="white" />
-//           </Pressable>
-//           <Text className="text-xl font-semibold text-white">Register</Text>
-//         </View>
-//       </View>
-
-//       <ScrollView className="flex-1 px-6 -mt-6">
-//         <Card className="p-6 rounded-2xl">
-//           {/* Avatar Placeholder */}
-//           <View className="items-center mb-6">
-//             <View className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500 to-blue-500 items-center justify-center mb-3">
-//               <User size={32} color="white" />
-//             </View>
-//             <Text className="font-medium text-gray-800">
-//               Create Your Account
-//             </Text>
-//           </View>
-
-//           {/* Full Name */}
-//           <Text className="text-sm font-medium text-gray-700 mb-2">
-//             Full Name
-//             </Text>
-//           <View className="relative mb-4">
-//             <User size={16} color="#9CA3AF" className="absolute left-3 top-4" />
-//             <Input
-//               value={form.name}
-//               onChangeText={(v) => setForm({ ...form, name: v })}
-//               placeholder="Enter your full name"
-//               className="pl-10"
-//             />
-//           </View>
-
-//           {/* Email */}
-//           <Text className="text-sm font-medium text-gray-700 mb-2">
-//             Email
-//             </Text>
-//           <View className="relative mb-4">
-//             <Mail size={16} color="#9CA3AF" className="absolute left-3 top-4" />
-//             <Input
-//               value={form.email}
-//               onChangeText={(v) => setForm({ ...form, email: v })}
-//               placeholder="Enter your email"
-//               keyboardType="email-address"
-//               className="pl-10"
-//               autoCapitalize="none"
-//             />
-//           </View>
-
-//           {/* Password */}
-//           <Text className="text-sm font-medium text-gray-700 mb-2">
-//             Password
-//             </Text>
-//           <View className="relative mb-4">
-//             <Lock size={16} color="#9CA3AF" className="absolute left-3 top-4" />
-//             <Input
-//               value={form.password}
-//               onChangeText={(v) => setForm({ ...form, password: v })}
-//               placeholder="Enter your password"
-//               secureTextEntry={!showPassword}
-//               className="pl-10 pr-10"
-//             />
-//             <Pressable
-//                 onPress={() => setShowPassword(!showPassword)}
-//                 className="absolute right-3 top-4"
-//             >
-//                 {showPassword ? <EyeOff size={18} color="#6B7280" /> : <Eye size={18} color="#6B7280" />}
-//             </Pressable>
-//           </View>
-
-//            {/* Confirm Password */}
-//            <Text className="text-sm font-medium text-gray-700 mb-2">
-//             Confirm Password
-//             </Text>
-//           <View className="relative mb-6">
-//             <Lock size={16} color="#9CA3AF" className="absolute left-3 top-4" />
-//             <Input
-//               value={form.confirmPassword}
-//               onChangeText={(v) => setForm({ ...form, confirmPassword: v })}
-//               placeholder="Confirm your password"
-//               secureTextEntry={!showConfirmPassword}
-//               className="pl-10 pr-10"
-//             />
-//             <Pressable
-//                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-//                 className="absolute right-3 top-4"
-//             >
-//                 {showConfirmPassword ? <EyeOff size={18} color="#6B7280" /> : <Eye size={18} color="#6B7280" />}
-//             </Pressable>
-//           </View>
-
-//           {/* Register Button */}
-//           <Button
-//             title={loading ? "Creating Account..." : "Register"}
-//             onPress={handleRegister}
-//             disabled={!isFormValid || loading}
-//             loading={loading}
-//             style={{ width: '100%', borderRadius: 12 }}
-//           />
-//         </Card>
-        
-//         {/* Login Link */}
-//         <View className="items-center mt-6 flex-row justify-center gap-2 mb-10">
-//            <Text className="text-sm text-gray-600">
-//              Already have an account?
-//            </Text>
-//            <Pressable onPress={() => router.replace("/(auth)/login")}>
-//              <Text className="text-green-600 font-medium">
-//                Login
-//              </Text>
-//            </Pressable>
-//         </View>
-
-//       </ScrollView>
-//     </View>
-//   );
-// }
-
 import { useRouter } from "expo-router";
 import { ArrowLeft, User, Mail, Lock, Eye, EyeOff } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View, Alert, StyleSheet } from "react-native";
+import { Pressable, ScrollView, Text, View, Alert, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Button } from "@/components/ui/button";
@@ -218,7 +44,11 @@ export default function RegisterScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "padding"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+    >
       {/* Header with LinearGradient */}
       <LinearGradient
         colors={["#22c55e", "#3b82f6"]}
@@ -236,7 +66,7 @@ export default function RegisterScreen() {
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Card style={styles.card}>
           {/* Avatar Placeholder */}
           <View style={styles.avatarContainer}>
@@ -312,14 +142,18 @@ export default function RegisterScreen() {
               {showConfirmPassword ? <EyeOff size={18} color="#6B7280" /> : <Eye size={18} color="#6B7280" />}
             </Pressable>
           </View>
-
-          <Button
-            title={loading ? "Creating Account..." : "Register"}
+          <Pressable
             onPress={handleRegister}
             disabled={!isFormValid || loading}
-            loading={loading}
-            style={{ marginTop: 10, borderRadius: 12 }}
-          />
+            style={[
+              styles.submitButton,
+              (!isFormValid || loading) && { opacity: 0.5 },
+              ]}
+              >
+            <Text style={styles.submitButtonText}>
+              {loading ? "Creating Account..." : "Register"}
+              </Text>
+            </Pressable>
         </Card>
         
         {/* Login Link */}
@@ -330,7 +164,7 @@ export default function RegisterScreen() {
           </Pressable>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -345,7 +179,7 @@ const styles = StyleSheet.create({
   },
   headerContent: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headerTitle: { fontSize: 20, fontWeight: '700', color: 'white' },
-  scrollView: { flex: 1, paddingHorizontal: 24, marginTop: -30 },
+  scrollView: { flex: 1, paddingHorizontal: 24, marginTop: -16 },
   card: { padding: 24, borderRadius: 24, elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10 },
   avatarContainer: { alignItems: 'center', marginBottom: 24 },
   avatarGradient: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
@@ -356,5 +190,19 @@ const styles = StyleSheet.create({
   eyeIcon: { position: 'absolute', right: 12, zIndex: 10 },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 24, marginBottom: 40 },
   footerText: { color: '#4b5563' },
-  loginLink: { color: '#16a34a', fontWeight: '700' }
+  loginLink: { color: '#16a34a', fontWeight: '700' },
+  submitButton: {
+    width: "100%",
+    height: 50,
+    marginTop: 10,
+    backgroundColor: "#2563eb",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 12,
+  },
+  submitButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
 });
