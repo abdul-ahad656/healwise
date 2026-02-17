@@ -45,3 +45,30 @@ def deactivate_tip(tip_id):
         return jsonify({"error": "Tip not found or already deactivated"}), 404
 
     return jsonify({"message": "Health tip deactivated"}), 200
+
+
+def update_tip(tip_id):
+    data = request.json or {}
+
+    tip = HealthTipModel.get_tip_by_id(tip_id)
+    if not tip:
+        return jsonify({"error": "Tip not found"}), 404
+
+    if data.get("type") == "disease" and not data.get("disease"):
+        return jsonify({"error": "Disease is required for disease-specific tips"}), 400
+
+    result = HealthTipModel.update_tip(tip_id, data)
+    if result is None:
+        return jsonify({"error": "No fields to update"}), 400
+
+    tip = HealthTipModel.get_tip_by_id(tip_id)
+    return jsonify(tip), 200
+
+
+def delete_tip(tip_id):
+    result = HealthTipModel.delete_tip(tip_id)
+
+    if result.deleted_count == 0:
+        return jsonify({"error": "Tip not found"}), 404
+
+    return jsonify({"message": "Health tip deleted"}), 200

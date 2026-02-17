@@ -48,8 +48,6 @@ class HealthTipModel:
                 {"type": "general"},
                 {"type": "disease", "disease": disease}
             ]
-        else:
-            query["type"] = "general"
 
         tips = list(mongo.db[HealthTipModel.COLLECTION].find(query))
 
@@ -73,3 +71,33 @@ class HealthTipModel:
         if tip:
             tip["_id"] = str(tip["_id"])
         return tip
+
+    @staticmethod
+    def update_tip(tip_id, data: dict):
+        update_fields = {}
+
+        for field in ["title", "description", "type", "language", "disease"]:
+            if field in data:
+                update_fields[field] = data[field]
+
+        if "image" in data or "video" in data:
+            media = {}
+            if "image" in data:
+                media["image"] = data.get("image")
+            if "video" in data:
+                media["video"] = data.get("video")
+            update_fields["media"] = media
+
+        if not update_fields:
+            return None
+
+        return mongo.db[HealthTipModel.COLLECTION].update_one(
+            {"_id": ObjectId(tip_id)},
+            {"$set": update_fields}
+        )
+
+    @staticmethod
+    def delete_tip(tip_id):
+        return mongo.db[HealthTipModel.COLLECTION].delete_one(
+            {"_id": ObjectId(tip_id)}
+        )

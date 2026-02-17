@@ -16,3 +16,17 @@ def create_or_update_awareness():
     if not admin_required():
         return {"error": "Admin only"}, 403
     return MedicineTypeController.create_awareness()
+
+@medicine_type_bp.get("/type-awareness")
+@jwt_required()
+def list_awareness():
+    if not admin_required():
+        return {"error": "Admin only"}, 403
+    return MedicineTypeController.list_awareness()
+
+@medicine_type_bp.delete("/type-awareness/<string:medicine_type>")
+@jwt_required()
+def delete_awareness(medicine_type):
+    if not admin_required():
+        return {"error": "Admin only"}, 403
+    return MedicineTypeController.delete_awareness(medicine_type)

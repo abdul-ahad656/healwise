@@ -62,3 +62,48 @@ def create_doctor():
         "message": "Doctor created successfully",
         "doctorId": doctor_id
     }), 201
+
+
+def update_doctor(doctor_id):
+    data = request.json or {}
+
+    doctor = mongo.db.users.find_one({"_id": ObjectId(doctor_id), "role": "doctor"})
+    if not doctor:
+        return jsonify({"error": "Doctor not found"}), 404
+
+    update_fields = {}
+
+    for field in ["name", "email", "language", "specialization", "experience", "hospital", "consultationFee"]:
+        if field in data:
+            update_fields[field] = data[field]
+
+    if "password" in data and data["password"]:
+        update_fields["password"] = generate_password_hash(data["password"])
+
+    if "active" in data:
+        update_fields["active"] = bool(data["active"])
+
+    if not update_fields:
+        return jsonify({"error": "No fields to update"}), 400
+
+    mongo.db.users.update_one(
+        {"_id": ObjectId(doctor_id)},
+        {"$set": update_fields}
+    )
+
+    doctor = mongo.db.users.find_one({"_id": ObjectId(doctor_id)})
+    doctor["_id"] = str(doctor["_id"])
+    doctor.pop("password", None)
+
+    return jsonify(doctor), 200
+
+
+def delete_doctor(doctor_id):
+    result = mongo.db.users.delete_one(
+        {"_id": ObjectId(doctor_id), "role": "doctor"}
+    )
+
+    if result.deleted_count == 0:
+        return jsonify({"error": "Doctor not found"}), 404
+
+    return jsonify({"message": "Doctor deleted"}), 200
