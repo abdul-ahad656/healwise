@@ -1,5 +1,6 @@
 import { API_BASE_URL } from './config';
 import AuthStore from './authStore';
+import i18n from '@/i18n';
 
 export interface User {
   id?: string;
@@ -30,9 +31,13 @@ export const login = async (email: string, password: string): Promise<AuthRespon
       throw new Error(data.error || 'Login failed');
     }
 
-    // Save token and user to store
     AuthStore.setToken(data.token);
     AuthStore.setUser(data.user);
+
+    const userLang = data.user?.language;
+    if (userLang) {
+      i18n.changeLanguage(userLang);
+    }
 
     return data;
   } catch (error: any) {
@@ -61,12 +66,44 @@ export const register = async (
       throw new Error(data.error || 'Registration failed');
     }
 
-    // Save token and user to store
     AuthStore.setToken(data.token);
     AuthStore.setUser(data.user);
+
+    const userLang = data.user?.language;
+    if (userLang) {
+      i18n.changeLanguage(userLang);
+    }
 
     return data;
   } catch (error: any) {
     throw new Error(error.message || 'Network error');
   }
+};
+
+export const setLanguagePreference = async (language: 'en' | 'ur'): Promise<void> => {
+  const token = AuthStore.getToken();
+
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/auth/language`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ language }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to update language');
+  }
+
+  // Update local session + UI language immediately
+  const user = AuthStore.getUser();
+  AuthStore.setUser({ ...(user || {}), language });
+  i18n.changeLanguage(language);
 };

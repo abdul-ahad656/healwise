@@ -13,10 +13,12 @@ import { ArrowLeft, AlertCircle, CheckCircle2, Activity } from 'lucide-react-nat
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { SymptomAnalysisResult } from '@/services/symptomService';
+import { useTranslation } from 'react-i18next';
 
 export default function SymptomResult() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { t } = useTranslation();
   
   let result: SymptomAnalysisResult | null = null;
   
@@ -64,8 +66,8 @@ export default function SymptomResult() {
               <ArrowLeft size={22} color="white" />
             </Pressable>
             <View>
-              <Text style={styles.headerTitle}>Analysis Result</Text>
-              <Text style={styles.headerSubtitle}>تشخیص کا نتیجہ</Text>
+              <Text style={styles.headerTitle}>{t("symptom_result_title")}</Text>
+              <Text style={styles.headerSubtitle}>{t("symptom_result_subtitle")}</Text>
             </View>
           </View>
         </SafeAreaView>
@@ -76,17 +78,16 @@ export default function SymptomResult() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Primary Prediction Card */}
         <Card style={styles.mainCard}>
           <View style={styles.iconContainer}>
             <Activity size={32} color="#ef4444" />
           </View>
           
-          <Text style={styles.labelTitle}>Possible Condition</Text>
+          <Text style={styles.labelTitle}>{t("symptom_result_label_title")}</Text>
           <Text style={styles.conditionName}>{result.prediction}</Text>
           
           <View style={styles.confidenceContainer}>
-            <Text style={styles.confidenceLabel}>AI Confidence:</Text>
+            <Text style={styles.confidenceLabel}>{t("symptom_result_confidence_label")}</Text>
             <View style={styles.confidenceBadge}>
               <Text style={styles.confidenceText}>{confidencePercentage}%</Text>
             </View>
@@ -95,15 +96,14 @@ export default function SymptomResult() {
           <View style={styles.disclaimerBox}>
             <AlertCircle size={16} color="#b91c1c" />
             <Text style={styles.disclaimerText}>
-              This is AI-generated advice, not a medical diagnosis. Please consult a doctor.
+              {t("symptom_result_disclaimer")}
             </Text>
           </View>
         </Card>
 
-        {/* Other Possibilities */}
         {result.allPredictions.length > 1 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Other Possibilities</Text>
+            <Text style={styles.sectionTitle}>{t("symptom_result_other_title")}</Text>
             {result.allPredictions.slice(1, 3).map((pred, index) => (
               <Card key={index} style={styles.possibilityCard}>
                 <View style={styles.row}>
@@ -125,7 +125,6 @@ export default function SymptomResult() {
           </View>
         )}
 
-        {/* Actions */}
         <Pressable 
           style={styles.consultButton}
           onPress={() =>
@@ -135,7 +134,7 @@ export default function SymptomResult() {
             })
           }
         >
-          <Text style={styles.consultButtonText}>Consult a Doctor Now</Text>
+          <Text style={styles.consultButtonText}>{t("symptom_result_consult_button")}</Text>
         </Pressable>
 
       </ScrollView>

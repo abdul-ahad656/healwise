@@ -110,7 +110,8 @@ def register_user(name, email, password, language="en", role="patient"):
             "id": user_id,
             "name": name,
             "email": email,
-            "role": role
+            "role": role,
+            "language": language
         }
     }, 201
 

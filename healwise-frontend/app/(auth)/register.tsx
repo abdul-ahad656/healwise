@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { register } from "@/services/authService";
+import { useTranslation } from "react-i18next";
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [form, setForm] = useState({
     name: "",
@@ -35,7 +37,10 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       const data = await register(form.name, form.email, form.password, 'patient');
-      router.replace("/(patient)/home");
+      router.replace({
+        pathname: "/(auth)/language",
+        params: { next: "/(patient)/home" },
+      } as any);
     } catch (error: any) {
       Alert.alert("Registration Failed", error.message);
     } finally {
@@ -62,13 +67,12 @@ export default function RegisterScreen() {
           >
             <ArrowLeft size={22} color="white" />
           </Pressable>
-          <Text style={styles.headerTitle}>Register</Text>
+          <Text style={styles.headerTitle}>{t("register")}</Text>
         </View>
       </LinearGradient>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Card style={styles.card}>
-          {/* Avatar Placeholder */}
           <View style={styles.avatarContainer}>
             <LinearGradient
               colors={["#22c55e", "#3b82f6"]}
@@ -76,43 +80,40 @@ export default function RegisterScreen() {
             >
               <User size={32} color="white" />
             </LinearGradient>
-            <Text style={styles.avatarText}>Create Your Account</Text>
+            <Text style={styles.avatarText}>{t("register_title")}</Text>
           </View>
 
-          {/* Full Name */}
-          <Text style={styles.label}>Full Name</Text>
+          <Text style={styles.label}>{t("full_name")}</Text>
           <View style={styles.inputWrapper}>
             <User size={16} color="#9CA3AF" style={styles.inputIcon} />
             <Input
               value={form.name}
               onChangeText={(v) => setForm({ ...form, name: v })}
-              placeholder="Enter your full name"
+              placeholder={t("full_name_placeholder")}
               style={{ paddingLeft: 40 }}
             />
           </View>
 
-          {/* Email */}
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t("email")}</Text>
           <View style={styles.inputWrapper}>
             <Mail size={16} color="#9CA3AF" style={styles.inputIcon} />
             <Input
               value={form.email}
               onChangeText={(v) => setForm({ ...form, email: v })}
-              placeholder="Enter your email"
+              placeholder={t("email_register_placeholder")}
               keyboardType="email-address"
               style={{ paddingLeft: 40 }}
               autoCapitalize="none"
             />
           </View>
 
-          {/* Password */}
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>{t("password")}</Text>
           <View style={styles.inputWrapper}>
             <Lock size={16} color="#9CA3AF" style={styles.inputIcon} />
             <Input
               value={form.password}
               onChangeText={(v) => setForm({ ...form, password: v })}
-              placeholder="Enter your password"
+              placeholder={t("password_register_placeholder")}
               secureTextEntry={!showPassword}
               style={{ paddingLeft: 40, paddingRight: 40 }}
             />
@@ -124,14 +125,13 @@ export default function RegisterScreen() {
             </Pressable>
           </View>
 
-          {/* Confirm Password */}
-          <Text style={styles.label}>Confirm Password</Text>
+          <Text style={styles.label}>{t("confirm_password")}</Text>
           <View style={styles.inputWrapper}>
             <Lock size={16} color="#9CA3AF" style={styles.inputIcon} />
             <Input
               value={form.confirmPassword}
               onChangeText={(v) => setForm({ ...form, confirmPassword: v })}
-              placeholder="Confirm your password"
+              placeholder={t("confirm_password_placeholder")}
               secureTextEntry={!showConfirmPassword}
               style={{ paddingLeft: 40, paddingRight: 40 }}
             />
@@ -151,16 +151,15 @@ export default function RegisterScreen() {
               ]}
               >
             <Text style={styles.submitButtonText}>
-              {loading ? "Creating Account..." : "Register"}
+              {loading ? t("creating_account") : t("register")}
               </Text>
             </Pressable>
         </Card>
         
-        {/* Login Link */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account? </Text>
+          <Text style={styles.footerText}>{t("already_account")} </Text>
           <Pressable onPress={() => router.replace("/(auth)/login")}>
-            <Text style={styles.loginLink}>Login</Text>
+            <Text style={styles.loginLink}>{t("login_link")}</Text>
           </Pressable>
         </View>
       </ScrollView>

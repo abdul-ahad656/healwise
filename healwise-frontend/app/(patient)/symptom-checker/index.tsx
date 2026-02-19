@@ -16,9 +16,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { analyzeSymptoms } from '@/services/symptomService';
 import Voice, { SpeechResultsEvent } from '@react-native-voice/voice';
+import { useTranslation } from 'react-i18next';
 
 export default function SymptomChecker() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [symptoms, setSymptoms] = useState('');
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -30,7 +32,7 @@ export default function SymptomChecker() {
     Voice.onSpeechStart = () => setIsListening(true);
     Voice.onSpeechEnd = () => setIsListening(false);
     Voice.onSpeechError = (e) => {
-      setError("Speech recognition error / آواز پہچاننے میں مسئلہ");
+      setError(t("speech_error"));
       setIsListening(false);
       console.error(e);
     };
@@ -83,8 +85,8 @@ export default function SymptomChecker() {
         pathname: "/(patient)/symptom-checker/result",
         params: { data: JSON.stringify(result) }
       });
-    } catch (error: any) {
-      setError(error.message || "An error occurred / کوئی مسئلہ پیش آیا");
+      } catch (error: any) {
+      setError(error.message || t("generic_error"));
     } finally {
       setLoading(false);
     }
@@ -109,8 +111,8 @@ export default function SymptomChecker() {
               <ArrowLeft size={22} color="white" />
             </Pressable>
             <View>
-              <Text style={styles.headerTitle}>Symptom Checker</Text>
-              <Text style={styles.headerSubtitle}>علامات کی جانچ</Text>
+              <Text style={styles.headerTitle}>{t("symptom_checker_title")}</Text>
+              <Text style={styles.headerSubtitle}>{t("symptom_checker_subtitle")}</Text>
             </View>
           </View>
         </SafeAreaView>
@@ -129,11 +131,11 @@ export default function SymptomChecker() {
         )}
 
         <Card style={styles.card}>
-          <Text style={styles.cardTitle}>Describe Your Symptoms</Text>
+          <Text style={styles.cardTitle}>{t("describe_symptoms")}</Text>
           
           <View style={[styles.inputContainer, isListening && styles.inputActive]}>
             <TextInput
-              placeholder={isListening ? "Listening... / سن رہا ہوں..." : "Type or speak symptoms..."}
+              placeholder={isListening ? t("symptom_placeholder_listening") : t("symptom_placeholder_typing")}
               placeholderTextColor={isListening ? "#ef4444" : "#9CA3AF"}
               value={symptoms}
               onChangeText={setSymptoms}
@@ -154,7 +156,7 @@ export default function SymptomChecker() {
           </View>
 
           {isListening && (
-            <Text style={styles.listeningHint}>Tap the mic to stop recording</Text>
+            <Text style={styles.listeningHint}>{t("listening_hint")}</Text>
           )}
 
           <Pressable
@@ -177,7 +179,7 @@ export default function SymptomChecker() {
               ) : (
                 <>
                   <Search size={20} color="white" />
-                  <Text style={styles.checkButtonText}>Analyze Symptoms</Text>
+                  <Text style={styles.checkButtonText}>{t("analyze_symptoms")}</Text>
                 </>
               )}
             </LinearGradient>

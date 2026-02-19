@@ -17,9 +17,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { login } from "@/services/authService";
+import { useTranslation } from "react-i18next";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +33,22 @@ export default function LoginScreen() {
     try {
       const data = await login(email, password);
       const role = data.user.role;
+      const userLang = data.user?.language;
+
+      if (!userLang) {
+        const next =
+          role === "doctor"
+            ? "/(doctor)/dashboard"
+            : role === "admin"
+              ? "/(admin)/dashboard"
+              : "/(patient)/home";
+
+        router.replace({
+          pathname: "/(auth)/language",
+          params: { next },
+        } as any);
+        return;
+      }
 
       if (role === "patient") router.replace("/(patient)/home");
       else if (role === "doctor") router.replace("/(doctor)/dashboard");
@@ -57,7 +75,6 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={{ flex: 1 }}>
-            {/* Header */}
             <LinearGradient
               colors={["#22c55e", "#3b82f6"]}
               start={{ x: 0, y: 0 }}
@@ -69,7 +86,7 @@ export default function LoginScreen() {
                   <Pressable onPress={() => router.back()} hitSlop={20}>
                     <ArrowLeft size={22} color="white" />
                   </Pressable>
-                  <Text style={styles.headerTitle}>Login</Text>
+                  <Text style={styles.headerTitle}>{t("login")}</Text>
                 </View>
               </SafeAreaView>
             </LinearGradient>
@@ -77,29 +94,29 @@ export default function LoginScreen() {
             {/* Main Content */}
             <View style={styles.mainContent}>
               <Card style={styles.card}>
-                <Text style={styles.welcomeText}>Welcome Back</Text>
-                <Text style={styles.subText}>Sign in to continue</Text>
+                <Text style={styles.welcomeText}>{t("welcome")}</Text>
+                <Text style={styles.subText}>{t("login_subtitle")}</Text>
 
-                <Text style={styles.label}>Email</Text>
+                <Text style={styles.label}>{t("email")}</Text>
                 <View style={styles.inputWrapper}>
                   <Mail size={16} color="#9CA3AF" style={styles.inputIcon} />
                   <Input
                     value={email}
                     onChangeText={setEmail}
-                    placeholder="Enter email"
+                    placeholder={t("email_placeholder")}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     style={{ paddingLeft: 40 }}
                   />
                 </View>
 
-                <Text style={styles.label}>Password</Text>
+                <Text style={styles.label}>{t("password")}</Text>
                 <View style={styles.inputWrapper}>
                   <Lock size={16} color="#9CA3AF" style={styles.inputIcon} />
                   <Input
                     value={password}
                     onChangeText={setPassword}
-                    placeholder="Enter password"
+                    placeholder={t("password_placeholder")}
                     secureTextEntry={!showPassword}
                     style={{ paddingLeft: 40, paddingRight: 45 }}
                   />
@@ -116,7 +133,7 @@ export default function LoginScreen() {
                 </View>
 
                 <Pressable style={styles.forgotBtn}>
-                  <Text style={styles.forgotText}>Forgot Password?</Text>
+                  <Text style={styles.forgotText}>{t("forgot_password")}</Text>
                 </Pressable>
 
                 <Pressable
@@ -128,17 +145,17 @@ export default function LoginScreen() {
                   ]}
                   >
                     <Text style={styles.submitButtonText}>
-                      {loading ? "Logging in..." : "Login"}
+                      {loading ? t("logging_in") : t("login")}
                       </Text>
                       </Pressable>
               </Card>
 
               <View style={styles.footer}>
                 <Text style={styles.footerText}>
-                  Don’t have an account?
+                  {t("no_account")}
                 </Text>
                 <Pressable onPress={() => router.push("/(auth)/register")}>
-                  <Text style={styles.registerLink}>Register Now</Text>
+                  <Text style={styles.registerLink}>{t("register_now")}</Text>
                 </Pressable>
               </View>
             </View>

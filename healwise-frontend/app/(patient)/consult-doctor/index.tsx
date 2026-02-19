@@ -23,9 +23,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { getPublicDoctors, Doctor } from '@/services/doctorService';
+import { useTranslation } from 'react-i18next';
 
 export default function DoctorConsultation() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const params = useLocalSearchParams<{ symptomId?: string }>();
   const symptomId = params.symptomId as string | undefined;
@@ -51,7 +53,6 @@ export default function DoctorConsultation() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <LinearGradient
         colors={["#a855f7", "#ec4899"]}
         start={{ x: 0, y: 0 }}
@@ -67,8 +68,8 @@ export default function DoctorConsultation() {
               <ArrowLeft size={24} color="white" />
             </Pressable>
             <View>
-              <Text style={styles.headerTitle}>Doctor Consultation</Text>
-              <Text style={styles.headerSubtitle}>ڈاکٹر سے مشورہ</Text>
+              <Text style={styles.headerTitle}>{t("doctor_consult_title")}</Text>
+              <Text style={styles.headerSubtitle}>{t("doctor_consult_subtitle")}</Text>
             </View>
           </View>
         </SafeAreaView>
@@ -79,31 +80,29 @@ export default function DoctorConsultation() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Quick Stats */}
         <View style={styles.statsGrid}>
           <Card style={[styles.statCard, { backgroundColor: '#f5f3ff' }]}>
             <Text style={styles.statValue}>1000+</Text>
-            <Text style={styles.statLabel}>Doctors</Text>
+            <Text style={styles.statLabel}>{t("doctor_stats_doctors")}</Text>
           </Card>
           <Card style={[styles.statCard, { backgroundColor: '#f0fdf4' }]}>
             <Text style={styles.statValue}>24/7</Text>
-            <Text style={styles.statLabel}>Available</Text>
+            <Text style={styles.statLabel}>{t("doctor_stats_available")}</Text>
           </Card>
           <Card style={[styles.statCard, { backgroundColor: '#eff6ff' }]}>
             <Text style={styles.statValue}>4.8★</Text>
-            <Text style={styles.statLabel}>Rating</Text>
+            <Text style={styles.statLabel}>{t("doctor_stats_rating")}</Text>
           </Card>
         </View>
 
-        {/* Doctors List */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>👨‍⚕️ Available Doctors</Text>
+          <Text style={styles.sectionTitle}>{t("doctor_available_title")}</Text>
           {loading ? (
-            <Text style={styles.loadingText}>Loading doctors...</Text>
+            <Text style={styles.loadingText}>{t("doctor_loading")}</Text>
           ) : error ? (
             <Text style={styles.errorText}>{error}</Text>
           ) : doctors.length === 0 ? (
-            <Text style={styles.emptyText}>No doctors found.</Text>
+            <Text style={styles.emptyText}>{t("doctor_empty")}</Text>
           ) : doctors.map((doctor) => (
             <Pressable
               key={doctor.id}
@@ -136,7 +135,7 @@ export default function DoctorConsultation() {
                         <Text style={styles.feeText}>
                           {doctor.consultationFee
                             ? `PKR ${doctor.consultationFee}`
-                            : 'Fee not set'}
+                            : t("doctor_fee_not_set")}
                         </Text>
                         <View style={styles.ratingRow}>
                           <Star size={12} color="#eab308" fill="#eab308" />
@@ -154,12 +153,12 @@ export default function DoctorConsultation() {
                       <Text style={styles.expText}>
                         {doctor.experience
                           ? `${doctor.experience} exp.`
-                          : 'Experience not specified'}
+                          : t("doctor_experience_not_specified")}
                       </Text>
                       <View style={[styles.statusBadge, { backgroundColor: '#f3f4f6' }]}>
                         <Clock size={10} color="#6b7280" />
                         <Text style={[styles.statusText, { color: '#4b5563' }]}>
-                          Online consultation
+                          {t("doctor_online_consultation")}
                         </Text>
                       </View>
                     </View>
@@ -168,11 +167,11 @@ export default function DoctorConsultation() {
 
                 <View style={styles.actionButtons}>
                   <Button 
-                    title="View Slots" 
+                    title={t("doctor_view_slots")} 
                     style={styles.videoBtn}
                   />
                   <Button 
-                    title="Chat" 
+                    title={t("doctor_chat")} 
                     variant="outline" 
                     style={styles.chatBtn}
                   />
@@ -182,25 +181,23 @@ export default function DoctorConsultation() {
           ))}
         </View>
 
-        {/* Emergency Card */}
         <Card style={styles.emergencyCard}>
           <View style={styles.emergencyIcon}>
             <Phone size={20} color="white" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.emergencyTitle}>Emergency</Text>
-            <Text style={styles.emergencyText}>Call 1122 for immediate help</Text>
+            <Text style={styles.emergencyTitle}>{t("doctor_emergency_title")}</Text>
+            <Text style={styles.emergencyText}>{t("doctor_emergency_text")}</Text>
           </View>
           <Pressable style={styles.callBtn} onPress={() => Linking.openURL('tel:1122')}>
-            <Text style={styles.callBtnText}>Call</Text>
+            <Text style={styles.callBtnText}>{t("doctor_emergency_call")}</Text>
           </Pressable>
         </Card>
 
-        {/* Disclaimer */}
         <View style={styles.disclaimer}>
           <Info size={14} color="#854d0e" />
           <Text style={styles.disclaimerText}>
-            Consultations are for general queries. In serious cases, visit a hospital.
+            {t("doctor_disclaimer")}
           </Text>
         </View>
       </ScrollView>

@@ -18,48 +18,50 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
+import { useTranslation } from 'react-i18next';
 
 export default function HomeDashboard() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const features = [
     {
       icon: Thermometer,
-      title: 'Symptom Checker',
-      subtitle: 'علامات کی جانچ',
-      description: 'Check your symptoms with AI',
+      titleKey: 'home_symptom_title',
+      subtitleKey: 'home_symptom_subtitle',
+      descKey: 'home_symptom_desc',
       color: '#ef4444',
       route: '/(patient)/symptom-checker'
     },
     {
       icon: Pill,
-      title: 'Medicine Comparison',
-      subtitle: 'دوا کا موازنہ',
-      description: 'Compare medicine prices',
+      titleKey: 'home_medicine_compare_title',
+      subtitleKey: 'home_medicine_compare_subtitle',
+      descKey: 'home_medicine_compare_desc',
       color: '#3b82f6',
       route: '/(patient)/medicine-compare'
     },
     {
       icon: Shield,
-      title: 'Medicine Awareness',
-      subtitle: 'دوا کی آگاہی',
-      description: 'Check drug interactions',
+      titleKey: 'home_medicine_awareness_title',
+      subtitleKey: 'home_medicine_awareness_subtitle',
+      descKey: 'home_medicine_awareness_desc',
       color: '#f97316',
       route: '/(patient)/medicine-awareness'
     },
     {
       icon: BookOpen,
-      title: 'Health Education',
-      subtitle: 'صحت کی تعلیم',
-      description: 'Learn about health topics',
+      titleKey: 'home_health_edu_title',
+      subtitleKey: 'home_health_edu_subtitle',
+      descKey: 'home_health_edu_desc',
       color: '#22c55e',
       route: '/(patient)/health-tips'
     },
     {
       icon: Video,
-      title: 'Doctor Consultation',
-      subtitle: 'ڈاکٹر سے مشورہ',
-      description: 'Talk to qualified doctors',
+      titleKey: 'home_doctor_title',
+      subtitleKey: 'home_doctor_subtitle',
+      descKey: 'home_doctor_desc',
       color: '#a855f7',
       route: '/consult-doctor'
     }
@@ -80,8 +82,8 @@ export default function HomeDashboard() {
         <SafeAreaView>
           <View style={styles.headerContent}>
             <View>
-              <Text style={styles.headerTitle}>Welcome to HealWise</Text>
-              <Text style={styles.headerSubtitle}>HealWise میں خوش آمدید</Text>
+              <Text style={styles.headerTitle}>{t('home_welcome')}</Text>
+              <Text style={styles.headerSubtitle}>{t('home_welcome_urdu')}</Text>
             </View>
           </View>
         </SafeAreaView>
@@ -107,9 +109,9 @@ export default function HomeDashboard() {
                     <feature.icon size={24} color="white" />
                   </View>
                   <View style={styles.textContainer}>
-                    <Text style={styles.featureTitle}>{feature.title}</Text>
-                    <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
-                    <Text style={styles.featureDesc}>{feature.description}</Text>
+                    <Text style={styles.featureTitle}>{t(feature.titleKey)}</Text>
+                    <Text style={styles.featureSubtitle}>{t(feature.subtitleKey)}</Text>
+                    <Text style={styles.featureDesc}>{t(feature.descKey)}</Text>
                   </View>
                   <ChevronRight size={20} color="#d1d5db" />
                 </View>
@@ -118,17 +120,6 @@ export default function HomeDashboard() {
           ))}
         </View>
 
-        {/* Quick Stats Row */}
-        <View style={styles.statsRow}>
-          <Card style={[styles.statCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
-            <Text style={styles.statValue}>24/7</Text>
-            <Text style={styles.statLabel}>Available</Text>
-          </Card>
-          <Card style={[styles.statCard, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}>
-            <Text style={styles.statValue}>1000+</Text>
-            <Text style={styles.statLabel}>Doctors</Text>
-          </Card>
-        </View>
       </ScrollView>
     </View>
   );

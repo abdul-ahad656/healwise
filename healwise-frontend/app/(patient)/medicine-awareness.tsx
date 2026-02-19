@@ -20,6 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { getMedicineTypeAwareness, MedicineTypeAwareness } from '@/services/medicineService';
+import { useTranslation } from 'react-i18next';
 
 export default function MedicineSafety() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function MedicineSafety() {
   const [awareness, setAwareness] = useState<MedicineTypeAwareness | null>(null);
   const [loadingAwareness, setLoadingAwareness] = useState(true);
   const [awarenessError, setAwarenessError] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const fetchAwareness = async () => {
@@ -116,7 +118,6 @@ export default function MedicineSafety() {
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Header */}
       <LinearGradient
         colors={["#f97316", "#ef4444"]}
         start={{ x: 0, y: 0 }}
@@ -136,8 +137,8 @@ export default function MedicineSafety() {
               <ArrowLeft size={22} color="white" />
             </Pressable>
             <View>
-              <Text style={styles.headerTitle}>Medicine Awareness</Text>
-              <Text style={styles.headerSubtitle}>دوا کی آگاہی</Text>
+              <Text style={styles.headerTitle}>{t("medicine_awareness_title")}</Text>
+              <Text style={styles.headerSubtitle}>{t("medicine_awareness_subtitle")}</Text>
             </View>
           </View>
         </SafeAreaView>
@@ -148,11 +149,10 @@ export default function MedicineSafety() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Medicine Type Awareness from Backend */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Shield size={20} color="#16a34a" />
-            <Text style={styles.sectionTitle}>Medicine Type Awareness</Text>
+            <Text style={styles.sectionTitle}>{t("medicine_awareness_section_title")}</Text>
           </View>
           <View style={styles.typeChipsRow}>
             {['Antibiotics', 'steroid', 'painkiller'].map((type) => (
@@ -179,7 +179,7 @@ export default function MedicineSafety() {
           {loadingAwareness ? (
             <ActivityIndicator size="small" color="#16a34a" />
           ) : awarenessError ? (
-            <Text style={styles.errorText}>{awarenessError}</Text>
+            <Text style={styles.errorText}>{t("medicine_awareness_error")}</Text>
           ) : awareness ? (
             <View style={{ gap: 12 }}>
               <Card style={styles.awarenessCard}>
@@ -188,40 +188,40 @@ export default function MedicineSafety() {
               </Card>
 
               <Card style={styles.awarenessCard}>
-                <Text style={styles.awarenessHeading}>Common Uses</Text>
+                <Text style={styles.awarenessHeading}>{t("medicine_awareness_common_uses")}</Text>
                 {normalizeList(awareness.common_uses).map((item, idx) => (
                   <Text key={idx} style={styles.awarenessItemText}>• {item}</Text>
                 ))}
               </Card>
 
               <Card style={styles.awarenessCard}>
-                <Text style={styles.awarenessHeading}>How to Use</Text>
+                <Text style={styles.awarenessHeading}>{t("medicine_awareness_how_to_use")}</Text>
                 {normalizeList(awareness.how_to_use).map((item, idx) => (
                   <Text key={idx} style={styles.awarenessItemText}>• {item}</Text>
                 ))}
               </Card>
 
               <Card style={styles.awarenessCard}>
-                <Text style={styles.awarenessHeading}>Precautions</Text>
+                <Text style={styles.awarenessHeading}>{t("medicine_awareness_precautions")}</Text>
                 {normalizeList(awareness.precautions).map((item, idx) => (
                   <Text key={idx} style={styles.awarenessItemText}>• {item}</Text>
                 ))}
               </Card>
 
               <Card style={styles.awarenessCard}>
-                <Text style={styles.awarenessHeading}>Side Effects</Text>
+                <Text style={styles.awarenessHeading}>{t("medicine_awareness_side_effects")}</Text>
                 {normalizeList(awareness.side_effects).map((item, idx) => (
                   <Text key={idx} style={styles.awarenessItemText}>• {item}</Text>
                 ))}
               </Card>
 
               <Card style={styles.awarenessCard}>
-                <Text style={styles.awarenessHeading}>Warnings</Text>
+                <Text style={styles.awarenessHeading}>{t("medicine_awareness_warnings")}</Text>
                 {normalizeList(awareness.warnings).map((item, idx) => (
                   <Text key={idx} style={styles.awarenessItemText}>• {item}</Text>
                 ))}
                 <Text style={styles.awarenessOtc}>
-                  {awareness.otc ? 'Available over the counter (OTC)' : 'Prescription only'}
+                  {awareness.otc ? t("medicine_awareness_otc_true") : t("medicine_awareness_otc_false")}
                 </Text>
               </Card>
 

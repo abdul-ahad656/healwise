@@ -1,6 +1,7 @@
 from flask import request, jsonify
 from flask_jwt_extended import get_jwt_identity
 from app.models.health_tip_model import HealthTipModel
+from app.utils.translate_utils import translate_to_urdu
 
 def add_tip():
     data = request.json
@@ -32,6 +33,20 @@ def add_tip():
 def get_tips():
     disease = request.args.get("disease")
     language = request.args.get("language", "en")
+    lang_pref = request.args.get("lang")
+
+    # Dynamic Urdu translation layer on top of English tips
+    if lang_pref == "ur":
+        base_tips = HealthTipModel.get_active_tips("en", disease)
+
+        for tip in base_tips:
+            # Translate title & description only, keep other fields as-is
+            tip["title"] = translate_to_urdu(tip.get("title", ""))
+            tip["description"] = translate_to_urdu(tip.get("description", ""))
+            # Mark language as Urdu in the response
+            tip["language"] = "ur"
+
+        return jsonify(base_tips), 200
 
     tips = HealthTipModel.get_active_tips(language, disease)
 

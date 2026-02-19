@@ -1,5 +1,6 @@
 import { API_BASE_URL } from './config';
 import AuthStore from './authStore';
+import i18n from '@/i18n';
 
 export interface HealthTip {
   _id: string;
@@ -26,6 +27,11 @@ export const getHealthTips = async (language: string = 'en', disease?: string): 
   try {
     const queryParams = new URLSearchParams({ language });
     if (disease) queryParams.append('disease', disease);
+
+    // If current UI language is Urdu, request dynamic Urdu from backend
+    if (i18n.language === 'ur') {
+      queryParams.append('lang', 'ur');
+    }
 
     const response = await fetch(`${API_BASE_URL}/health-tips/?${queryParams.toString()}`, {
       method: 'GET',

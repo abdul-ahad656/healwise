@@ -37,6 +37,7 @@ import { ArrowLeft, Search, DollarSign, Star, Info } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { compareMedicines, CompareResult } from '@/services/medicineService';
+import { useTranslation } from 'react-i18next';
 
 export default function MedicineComparison() {
   const router = useRouter();
@@ -44,6 +45,7 @@ export default function MedicineComparison() {
   const [results, setResults] = useState<CompareResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) return;
@@ -73,7 +75,6 @@ export default function MedicineComparison() {
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Header */}
       <LinearGradient
         colors={["#3b82f6", "#06b6d4"]}
         start={{ x: 0, y: 0 }}
@@ -86,8 +87,8 @@ export default function MedicineComparison() {
               <ArrowLeft size={22} color="white" />
             </Pressable>
             <View>
-              <Text style={styles.headerTitle}>Medicine Comparison</Text>
-              <Text style={styles.headerSubtitle}>دوا کا موازنہ</Text>
+              <Text style={styles.headerTitle}>{t("medicine_compare_title")}</Text>
+              <Text style={styles.headerSubtitle}>{t("medicine_compare_subtitle")}</Text>
             </View>
           </View>
         </SafeAreaView>
@@ -98,14 +99,13 @@ export default function MedicineComparison() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Search Card */}
         <Card style={styles.card}>
-          <Text style={styles.cardTitle}>Find Medicine Alternatives</Text>
+          <Text style={styles.cardTitle}>{t("medicine_find_alternatives")}</Text>
           
           <View style={styles.inputWrapper}>
             <Search size={18} color="#9CA3AF" style={styles.inputIcon} />
             <TextInput
-              placeholder="Enter medicine name... / دوا کا نام"
+              placeholder={t("medicine_search_placeholder")}
               placeholderTextColor="#9CA3AF"
               value={searchTerm}
               onChangeText={setSearchTerm}
@@ -131,7 +131,7 @@ export default function MedicineComparison() {
               {loading ? (
                 <ActivityIndicator color="white" />
               ) : (
-                <Text style={styles.buttonText}>Compare Prices</Text>
+                <Text style={styles.buttonText}>{t("medicine_compare_button")}</Text>
               )}
             </LinearGradient>
           </Pressable>
@@ -150,14 +150,14 @@ export default function MedicineComparison() {
             <View style={styles.saltCard}>
               <View style={styles.saltHeader}>
                 <Info size={16} color="#0369a1" />
-                <Text style={styles.saltLabel}>Active Salt Detected</Text>
+                <Text style={styles.saltLabel}>{t("medicine_active_salt")}</Text>
               </View>
               <Text style={styles.saltName}>{results.salt}</Text>
             </View>
 
             <View style={styles.listHeader}>
               <DollarSign size={20} color="#16a34a" />
-              <Text style={styles.listTitle}>Alternative Brands</Text>
+              <Text style={styles.listTitle}>{t("medicine_alternative_brands")}</Text>
             </View>
             
             {/* Alternatives List */}
@@ -174,7 +174,7 @@ export default function MedicineComparison() {
                       {isAffordable && (
                         <View style={styles.badge}>
                           <Star size={10} color="white" fill="white" />
-                          <Text style={styles.badgeText}>Best Price</Text>
+                          <Text style={styles.badgeText}>{t("medicine_best_price_badge")}</Text>
                         </View>
                       )}
                     </View>
@@ -190,10 +190,9 @@ export default function MedicineComparison() {
             <View style={styles.tipCard}>
               <Star size={20} color="#15803d" />
               <View style={styles.tipContent}>
-                <Text style={styles.tipTitle}>Money Saving Tip</Text>
+                <Text style={styles.tipTitle}>{t("medicine_money_saving_tip_title")}</Text>
                 <Text style={styles.tipText}>
-                  Generic brands contain the same active ingredients at lower costs. 
-                  Always consult your pharmacist before switching.
+                  {t("medicine_money_saving_tip_text")}
                 </Text>
               </View>
             </View>

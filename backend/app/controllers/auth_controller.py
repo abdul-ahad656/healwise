@@ -11,6 +11,9 @@
 
 
 from flask import request
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from bson.objectid import ObjectId
+from app.extensions import mongo
 from app.services.auth_service import register_user, login_user
 
 def register():
@@ -35,3 +38,20 @@ def login():
         data["email"],
         data["password"]
     )
+
+
+@jwt_required()
+def set_language():
+    user_id = get_jwt_identity()
+    data = request.json or {}
+    language = data.get("language")
+
+    if language not in ["en", "ur"]:
+        return {"error": "Invalid language"}, 400
+
+    mongo.db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"language": language}}
+    )
+
+    return {"message": "Language updated", "language": language}, 200

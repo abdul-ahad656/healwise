@@ -22,11 +22,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { getHealthTips, HealthTip } from '@/services/healthTipService';
+import { useTranslation } from 'react-i18next';
 
 export default function HealthEducation() {
   const router = useRouter();
   const [tips, setTips] = useState<HealthTip[]>([]);
   const [loading, setLoading] = useState(true);
+  const { t } = useTranslation();
 
   useEffect(() => {
     fetchTips();
@@ -43,28 +45,13 @@ export default function HealthEducation() {
     }
   };
 
-  // const healthAlerts = [
-  //   {
-  //     title: 'Dengue Alert in Karachi',
-  //     urgency: 'High',
-  //     date: '2 days ago'
-  //   },
-  //   {
-  //     title: 'Free Blood Pressure Checkup',
-  //     urgency: 'Info',
-  //     date: '1 week ago'
-  //   }
-  // ];
-
   return (
     <View style={styles.container}>
-      {/* Background Layer */}
       <LinearGradient
         colors={["#f0fdf4", "#ffffff", "#f0f9ff"]}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Header */}
       <LinearGradient
         colors={["#22c55e", "#10b981"]}
         start={{ x: 0, y: 0 }}
@@ -84,8 +71,8 @@ export default function HealthEducation() {
               <ArrowLeft size={22} color="white" />
             </Pressable>
             <View>
-              <Text style={styles.headerTitle}>Health Education</Text>
-              <Text style={styles.headerSubtitle}>صحت کی تعلیم</Text>
+              <Text style={styles.headerTitle}>{t("health_education_title")}</Text>
+              <Text style={styles.headerSubtitle}>{t("health_education_subtitle")}</Text>
             </View>
           </View>
         </SafeAreaView>
@@ -96,11 +83,10 @@ export default function HealthEducation() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Health Alerts Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Bell size={18} color="#16a34a" />
-            <Text style={styles.sectionTitle}>Local Health Alerts</Text>
+            <Text style={styles.sectionTitle}>{t("health_alerts_title")}</Text>
           </View>
           
           {/* <View style={{ gap: 10 }}>
@@ -123,17 +109,16 @@ export default function HealthEducation() {
           </View> */}
         </View>
 
-        {/* Learn Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <BookOpen size={20} color="#16a34a" />
-            <Text style={styles.sectionTitle}>Learn About Health</Text>
+            <Text style={styles.sectionTitle}>{t("health_learn_section")}</Text>
           </View>
 
           {loading ? (
             <ActivityIndicator size="large" color="#22c55e" />
           ) : tips.length === 0 ? (
-             <Text style={styles.noTipsText}>No health tips available.</Text>
+             <Text style={styles.noTipsText}>{t("health_no_tips")}</Text>
           ) : (
             tips.map((content) => (
             <Card key={content._id} style={styles.contentCard}>
@@ -147,10 +132,9 @@ export default function HealthEducation() {
                     <View style={styles.categoryBadge}>
                       <Text style={styles.categoryText}>{content.type === 'disease' ? 'Disease Info' : 'General'}</Text>
                     </View>
-                    {/* Placeholder for duration if available in future */}
                     <View style={styles.durationBox}>
                        <Clock size={10} color="#6b7280" />
-                       <Text style={styles.durationText}>Read now</Text>
+                       <Text style={styles.durationText}>{t("health_read_now")}</Text>
                     </View>
                   </View>
                   
@@ -164,10 +148,9 @@ export default function HealthEducation() {
             ))
           )}
           
-          <Button variant="outline" title="Explore All Topics" style={{ marginTop: 8 }} />
+          <Button variant="outline" title={t("health_learn_section")} style={{ marginTop: 8 }} />
         </View>
 
-        {/* Daily Tip */}
         <Card style={styles.tipCard}>
           <LinearGradient
             colors={["#f0fdf4", "#dcfce7"]}
@@ -177,7 +160,7 @@ export default function HealthEducation() {
             <Text style={{ fontSize: 20 }}>💡</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.tipLabel}>Daily Health Tip</Text>
+            <Text style={styles.tipLabel}>{t("health_daily_tip_label")}</Text>
             <Text style={styles.tipText}>
               Drink at least 8 glasses of water daily to stay hydrated and maintain good health.
             </Text>
