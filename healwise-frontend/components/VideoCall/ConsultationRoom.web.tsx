@@ -17,7 +17,6 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { ZegoUIKitPrebuilt } from '@zegocloud/zego-uikit-prebuilt';
 import { useRouter } from 'expo-router';
 import { useZegoConfig } from '@/hooks/useZegoConfig';
 
@@ -44,40 +43,55 @@ export default function ConsultationRoom({
   const { appID, appSign, error } = useZegoConfig();
 
   useEffect(() => {
+    // SSR guard: expo-router web SSR runs in Node where `document` doesn't exist.
+    if (typeof document === 'undefined') return;
+
     // Do not initialise if credentials are missing or the container is not yet
     // in the DOM.
     if (error || appID === null || !containerRef.current) return;
 
-    /**
-     * generateKitTokenForTest uses the App Sign directly in the browser.
-     * Use a server-generated token for production deployments.
-     */
-    const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
-      appID,
-      appSign,       // called "serverSecret" in the JS SDK docs
-      appointmentId, // roomID – participants with the same ID enter the same room
-      userID,
-      userName,
-    );
+    let destroyed = false;
+    let zp: { destroy: () => void; joinRoom: (options: any) => void } | null =
+      null;
 
-    const zp = ZegoUIKitPrebuilt.create(kitToken);
+    (async () => {
+      const mod = await import('@zegocloud/zego-uikit-prebuilt');
+      const ZegoUIKitPrebuilt = mod.ZegoUIKitPrebuilt;
 
-    zp.joinRoom({
-      container: containerRef.current,
-      scenario: {
-        mode: ZegoUIKitPrebuilt.OneONoneCall,
-      },
+      if (destroyed || !containerRef.current) return;
+
       /**
-       * Navigate back to the previous screen when the local user leaves the
-       * call via the "Leave" button or the room is otherwise closed.
+       * generateKitTokenForTest uses the App Sign directly in the browser.
+       * Use a server-generated token for production deployments.
        */
-      onLeaveRoom: () => router.back(),
-    });
+      const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
+        appID,
+        appSign, // called "serverSecret" in the JS SDK docs
+        appointmentId, // roomID – participants with the same ID enter the same room
+        userID,
+        userName
+      );
+
+      zp = ZegoUIKitPrebuilt.create(kitToken);
+
+      zp.joinRoom({
+        container: containerRef.current,
+        scenario: {
+          mode: ZegoUIKitPrebuilt.OneONoneCall,
+        },
+        /**
+         * Navigate back to the previous screen when the local user leaves the
+         * call via the "Leave" button or the room is otherwise closed.
+         */
+        onLeaveRoom: () => router.back(),
+      });
+    })();
 
     // Cleanup: destroy the ZEGOCLOUD instance when the component unmounts so
     // camera and microphone tracks are properly released.
     return () => {
-      zp.destroy();
+      destroyed = true;
+      zp?.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appID, appSign, appointmentId, userID, userName]);
