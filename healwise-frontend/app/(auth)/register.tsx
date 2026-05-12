@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { ArrowLeft, User, Mail, Lock, Eye, EyeOff } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View, Alert, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
+import { Pressable, ScrollView, Text, View, Alert, StyleSheet, KeyboardAvoidingView, Platform, InteractionManager } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Button } from "@/components/ui/button";
@@ -36,11 +36,13 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      const data = await register(form.name, form.email, form.password, 'patient');
-      router.replace({
-        pathname: "/(auth)/language",
-        params: { next: "/(patient)/home" },
-      } as any);
+      await register(form.name, form.email, form.password, 'patient');
+      InteractionManager.runAfterInteractions(() => {
+        router.replace({
+          pathname: "/(auth)/language",
+          params: { next: "/(patient)/home" },
+        } as any);
+      });
     } catch (error: any) {
       Alert.alert("Registration Failed", error.message);
     } finally {

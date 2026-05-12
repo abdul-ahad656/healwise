@@ -5,8 +5,8 @@ import {
   Text,
   Pressable,
   ScrollView,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
   ChevronRight, 
@@ -79,7 +79,7 @@ export default function HomeDashboard() {
         end={{ x: 1, y: 0 }}
         style={styles.header}
       >
-        <SafeAreaView>
+        <SafeAreaView edges={['top']}>
           <View style={styles.headerContent}>
             <View>
               <Text style={styles.headerTitle}>{t('home_welcome')}</Text>

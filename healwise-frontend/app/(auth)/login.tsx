@@ -10,8 +10,9 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
+  InteractionManager,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { Card } from "@/components/ui/card";
@@ -35,27 +36,30 @@ export default function LoginScreen() {
       const role = data.user.role;
       const userLang = data.user?.language;
 
-      if (!userLang) {
-        const next =
-          role === "doctor"
-            ? "/(doctor)/dashboard"
-            : role === "admin"
-              ? "/(admin)/dashboard"
-              : "/(patient)/home";
+      // Defer navigation so loading state clears and the router commit isn’t blocked on Android.
+      InteractionManager.runAfterInteractions(() => {
+        if (!userLang) {
+          const next =
+            role === "doctor"
+              ? "/(doctor)/dashboard"
+              : role === "admin"
+                ? "/(admin)/dashboard"
+                : "/(patient)/home";
 
-        router.replace({
-          pathname: "/(auth)/language",
-          params: { next },
-        } as any);
-        return;
-      }
+          router.replace({
+            pathname: "/(auth)/language",
+            params: { next },
+          } as any);
+          return;
+        }
 
-      if (role === "patient") router.replace("/(patient)/home");
-      else if (role === "doctor") router.replace("/(doctor)/dashboard");
-      else if (role === "admin") router.replace("/(admin)/dashboard");
-      else {
-        Alert.alert("Login Failed", "Unknown role: " + String(role));
-      }
+        if (role === "patient") router.replace("/(patient)/home");
+        else if (role === "doctor") router.replace("/(doctor)/dashboard");
+        else if (role === "admin") router.replace("/(admin)/dashboard");
+        else {
+          Alert.alert("Login Failed", "Unknown role: " + String(role));
+        }
+      });
     } catch (error: any) {
       Alert.alert("Login Failed", error.message);
     } finally {
@@ -81,7 +85,7 @@ export default function LoginScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.header}
             >
-              <SafeAreaView>
+              <SafeAreaView edges={["top"]}>
                 <View style={styles.headerContent}>
                   <Pressable onPress={() => router.back()} hitSlop={20}>
                     <ArrowLeft size={22} color="white" />

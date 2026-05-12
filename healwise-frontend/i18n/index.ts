@@ -35,6 +35,8 @@ const resources = {
       listening_hint: "Tap the mic to stop recording",
       analyze_symptoms: "Analyze Symptoms",
       speech_error: "Speech recognition error / آواز پہچاننے میں مسئلہ",
+      voice_native_unavailable:
+        "Voice module is not linked. Run npm install (applies patch), then npx expo run:android — or type symptoms.",
       generic_error: "An error occurred / کوئی مسئلہ پیش آیا",
       health_education_title: "Health Education",
       health_education_subtitle: "صحت کی تعلیم",
@@ -159,6 +161,8 @@ const resources = {
       listening_hint: "ریکارڈنگ روکنے کے لیے مائیک پر ٹیپ کریں",
       analyze_symptoms: "علامات کا تجزیہ کریں",
       speech_error: "آواز پہچاننے میں مسئلہ",
+      voice_native_unavailable:
+        "وائس ماڈیول منسلک نہیں۔ npm install چلائیں، پھر expo run:android — یا علامات ٹائپ کریں۔",
       generic_error: "کوئی مسئلہ پیش آیا",
       
       // Health Education

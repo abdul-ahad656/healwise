@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './config';
 import AuthStore from './authStore';
 import i18n from '@/i18n';
+import { fetchJson } from './httpClient';
 
 export interface User {
   id?: string;
@@ -17,18 +18,19 @@ export interface AuthResponse {
 
 export const login = async (email: string, password: string): Promise<AuthResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await response.json();
+    const { response, data } = await fetchJson<AuthResponse>(
+      `${API_BASE_URL}/auth/login`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      }
+    );
 
     if (!response.ok) {
-      throw new Error(data.error || 'Login failed');
+      throw new Error((data as { error?: string }).error || 'Login failed');
     }
 
     AuthStore.setToken(data.token);
@@ -87,16 +89,17 @@ export const setLanguagePreference = async (language: 'en' | 'ur'): Promise<void
     throw new Error('User not authenticated');
   }
 
-  const response = await fetch(`${API_BASE_URL}/auth/language`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ language }),
-  });
-
-  const data = await response.json();
+  const { response, data } = await fetchJson<{ error?: string }>(
+    `${API_BASE_URL}/auth/language`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ language }),
+    }
+  );
 
   if (!response.ok) {
     throw new Error(data.error || 'Failed to update language');

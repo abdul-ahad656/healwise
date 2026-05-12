@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -8,7 +8,8 @@ import {
   ScrollView, 
   SafeAreaView, 
   ActivityIndicator,
-  Platform
+  Platform,
+  NativeModules,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mic, MicOff, Search, Info } from 'lucide-react-native';
@@ -26,9 +27,16 @@ export default function SymptomChecker() {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isVoiceSupported = Platform.OS === 'ios' || Platform.OS === 'android';
+  /** Android registers the native module as `RCTVoice`; iOS as `Voice`. Library expects `Voice` unless patched. */
+  const isVoiceNativeLinked = useMemo(
+    () =>
+      isVoiceSupported &&
+      (NativeModules.RCTVoice != null || NativeModules.Voice != null),
+    [isVoiceSupported]
+  );
 
   useEffect(() => {
-    if (!isVoiceSupported) return;
+    if (!isVoiceSupported || !isVoiceNativeLinked) return;
     Voice.onSpeechStart = () => setIsListening(true);
     Voice.onSpeechEnd = () => setIsListening(false);
     Voice.onSpeechError = (e) => {
@@ -55,12 +63,16 @@ export default function SymptomChecker() {
           } catch {}
         });
     };
-  }, [isVoiceSupported]);
+  }, [isVoiceSupported, isVoiceNativeLinked]);
 
   const toggleListening = async () => {
     try {
       if (!isVoiceSupported) {
         setError("Voice input is not supported on this platform");
+        return;
+      }
+      if (!isVoiceNativeLinked) {
+        setError(t("voice_native_unavailable"));
         return;
       }
       if (isListening) {
@@ -71,6 +83,7 @@ export default function SymptomChecker() {
       }
     } catch (e) {
       console.error(e);
+      setError(t("speech_error"));
     }
   };
 
@@ -155,6 +168,9 @@ export default function SymptomChecker() {
             </Pressable>
           </View>
 
+          {!isVoiceNativeLinked && isVoiceSupported && (
+            <Text style={styles.voiceUnavailableHint}>{t("voice_native_unavailable")}</Text>
+          )}
           {isListening && (
             <Text style={styles.listeningHint}>{t("listening_hint")}</Text>
           )}
@@ -230,6 +246,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   micButtonActive: { backgroundColor: '#ef4444' },
+  micButtonDisabled: { opacity: 0.55 },
+  voiceUnavailableHint: { fontSize: 12, color: '#9ca3af', marginBottom: 12, lineHeight: 18 },
   listeningHint: { textAlign: 'center', color: '#ef4444', fontSize: 12, marginBottom: 15, fontWeight: '500' },
   checkButtonWrapper: { borderRadius: 12, overflow: 'hidden' },
   checkButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, gap: 8 },
