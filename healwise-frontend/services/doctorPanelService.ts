@@ -186,3 +186,105 @@ export const getSymptomHistoryForAppointment = async (
   return data;
 };
 
+export interface Prescription {
+  _id: string;
+  appointmentId: string;
+  doctorId: string;
+  patientId: string;
+  cloudinaryUrl: string;
+  cloudinaryPublicId: string;
+  fileType: string;
+  notes?: string;
+  uploadedAt: string;
+  doctorName?: string;
+  doctorSpecialization?: string;
+  appointmentDate?: string;
+  appointmentTime?: string;
+}
+
+export const uploadPrescription = async (
+  appointmentId: string,
+  fileUri: string,
+  fileName: string,
+  notes?: string
+): Promise<Prescription> => {
+  const token = AuthStore.getToken();
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const formData = new FormData();
+  formData.append('prescription', {
+    uri: fileUri,
+    name: fileName,
+    type: getMimeType(fileName),
+  } as any);
+
+  if (notes) {
+    formData.append('notes', notes);
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/prescriptions/upload/${appointmentId}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to upload prescription');
+  }
+
+  return data.prescription;
+};
+
+export const getPatientPrescriptions = async (): Promise<Prescription[]> => {
+  const headers = getAuthHeaders();
+
+  const response = await fetch(`${API_BASE_URL}/prescriptions`, {
+    method: 'GET',
+    headers,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to load prescriptions');
+  }
+
+  return data;
+};
+
+export const getPrescription = async (appointmentId: string): Promise<Prescription> => {
+  const headers = getAuthHeaders();
+
+  const response = await fetch(`${API_BASE_URL}/prescriptions/${appointmentId}`, {
+    method: 'GET',
+    headers,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to load prescription');
+  }
+
+  return data;
+};
+
+function getMimeType(fileName: string): string {
+  const ext = fileName.toLowerCase().split('.').pop();
+  const mimeTypes: { [key: string]: string } = {
+    pdf: 'application/pdf',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+  };
+  return mimeTypes[ext || 'pdf'] || 'application/octet-stream';
+}

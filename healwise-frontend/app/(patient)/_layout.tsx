@@ -87,6 +87,17 @@ export default function PatientLayout() {
           tabBarIcon: ({ color, size }) => <FontAwesome name="user" color={color} size={size} />,
         }}
       />
+
+      {/* Hide these screens from tab bar but keep them accessible via navigation */}
+      <Tabs.Screen name="prescriptions" options={{ href: null }} />
+      <Tabs.Screen name="appointments" options={{ href: null }} />
+      <Tabs.Screen name="medical-reports" options={{ href: null }} />
+      <Tabs.Screen name="health-tips" options={{ href: null }} />
+      <Tabs.Screen name="medicine-awareness" options={{ href: null }} />
+      <Tabs.Screen name="medicine-compare" options={{ href: null }} />
+      <Tabs.Screen name="consult-doctor" options={{ href: null }} />
+      <Tabs.Screen name="feedback" options={{ href: null }} />
     </Tabs>
   );
 }
+

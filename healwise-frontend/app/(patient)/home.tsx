@@ -8,13 +8,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { 
-  ChevronRight, 
-  Thermometer, 
-  Pill, 
-  Shield, 
-  BookOpen, 
-  Video 
+import {
+  ChevronRight,
+  Thermometer,
+  Pill,
+  Shield,
+  BookOpen,
+  Video,
+  FileText
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
@@ -56,6 +57,14 @@ export default function HomeDashboard() {
       descKey: 'home_health_edu_desc',
       color: '#22c55e',
       route: '/(patient)/health-tips'
+    },
+    {
+      icon: FileText,
+      titleKey: 'home_prescription_title',
+      subtitleKey: 'home_prescription_subtitle',
+      descKey: 'home_prescription_desc',
+      color: '#06b6d4',
+      route: '/(patient)/prescriptions'
     },
     {
       icon: Video,

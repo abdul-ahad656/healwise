@@ -3,6 +3,7 @@ flask-cors
 flask-pymongo
 flask-jwt-extended
 python-dotenv
+cloudinary
 transformers
 torch
 pandas
