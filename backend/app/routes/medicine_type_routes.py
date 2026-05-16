@@ -7,8 +7,13 @@ medicine_type_bp = Blueprint("medicine_type_bp", __name__)
 
 medicine_type_bp.route(
     "/type-awareness/<string:medicine_type>",
-    methods=["GET"]
+    methods=["GET"],
 )(MedicineTypeController.awareness)
+
+@medicine_type_bp.get("/types")
+def list_medicine_types():
+    """Public: all medicine types currently stored (for patient dropdown)."""
+    return MedicineTypeController.list_types()
 
 @medicine_type_bp.post("/type-awareness")
 @jwt_required()

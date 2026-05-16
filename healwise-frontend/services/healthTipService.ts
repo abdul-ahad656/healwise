@@ -17,29 +17,70 @@ export interface HealthTip {
   createdAt: string;
 }
 
-export const getHealthTips = async (language: string = 'en', disease?: string): Promise<HealthTip[]> => {
-  const token = AuthStore.getToken();
+export interface HealthTipCategory {
+  key: string;
+  label: string;
+  type: 'general' | 'disease';
+  disease: string | null;
+}
 
+function authHeaders(): HeadersInit {
+  const token = AuthStore.getToken();
   if (!token) {
     throw new Error('User not authenticated');
   }
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+}
 
+export const getHealthTipCategories = async (): Promise<HealthTipCategory[]> => {
   try {
-    const queryParams = new URLSearchParams({ language });
-    if (disease) queryParams.append('disease', disease);
+    const response = await fetch(
+      `${API_BASE_URL}/health-tips/categories?language=en`,
+      { method: 'GET', headers: authHeaders() }
+    );
 
-    // If current UI language is Urdu, request dynamic Urdu from backend
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to fetch health categories');
+    }
+
+    const categories = data.categories ?? [];
+    if (!Array.isArray(categories)) return [];
+
+    return categories.filter(
+      (c: HealthTipCategory) => c && typeof c.key === 'string' && typeof c.label === 'string'
+    );
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Network error';
+    throw new Error(msg);
+  }
+};
+
+export const getHealthTips = async (
+  category?: HealthTipCategory | null
+): Promise<HealthTip[]> => {
+  try {
+    const queryParams = new URLSearchParams({ language: 'en' });
+
+    if (category) {
+      queryParams.append('type', category.type);
+      if (category.type === 'disease' && category.disease) {
+        queryParams.append('disease', category.disease);
+      }
+    }
+
     if (i18n.language === 'ur') {
       queryParams.append('lang', 'ur');
     }
 
-    const response = await fetch(`${API_BASE_URL}/health-tips/?${queryParams.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/health-tips/?${queryParams.toString()}`,
+      { method: 'GET', headers: authHeaders() }
+    );
 
     const data = await response.json();
 
@@ -47,8 +88,9 @@ export const getHealthTips = async (language: string = 'en', disease?: string): 
       throw new Error(data.error || 'Failed to fetch health tips');
     }
 
-    return data;
-  } catch (error: any) {
-    throw new Error(error.message || 'Network error');
+    return Array.isArray(data) ? data : [];
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Network error';
+    throw new Error(msg);
   }
 };

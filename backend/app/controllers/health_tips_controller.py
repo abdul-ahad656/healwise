@@ -32,25 +32,29 @@ def add_tip():
 
 def get_tips():
     disease = request.args.get("disease")
+    tip_type = request.args.get("type")
     language = request.args.get("language", "en")
     lang_pref = request.args.get("lang")
 
-    # Dynamic Urdu translation layer on top of English tips
     if lang_pref == "ur":
-        base_tips = HealthTipModel.get_active_tips("en", disease)
+        base_tips = HealthTipModel.get_active_tips("en", disease, tip_type)
 
         for tip in base_tips:
-            # Translate title & description only, keep other fields as-is
             tip["title"] = translate_to_urdu(tip.get("title", ""))
             tip["description"] = translate_to_urdu(tip.get("description", ""))
-            # Mark language as Urdu in the response
             tip["language"] = "ur"
 
         return jsonify(base_tips), 200
 
-    tips = HealthTipModel.get_active_tips(language, disease)
+    tips = HealthTipModel.get_active_tips(language, disease, tip_type)
 
     return jsonify(tips), 200
+
+
+def list_categories():
+    language = request.args.get("language", "en")
+    categories = HealthTipModel.get_category_filters(language)
+    return jsonify({"categories": categories}), 200
 
 
 def deactivate_tip(tip_id):

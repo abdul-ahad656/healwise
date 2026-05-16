@@ -108,7 +108,6 @@ export const getMedicineTypeAwareness = async (
 
     // If backend didn't return JSON (e.g. HTML error page), avoid JSON parse crash
     if (!contentType.includes('application/json')) {
-      const text = await response.text();
       throw new Error(
         `Unexpected response from server: ${response.status} ${response.statusText}`
       );
@@ -123,5 +122,43 @@ export const getMedicineTypeAwareness = async (
     return data;
   } catch (error: any) {
     throw new Error(error.message || 'Network error');
+  }
+};
+
+export const getMedicineTypes = async (): Promise<string[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/medicine-awareness/types`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(`Unexpected response from server: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to fetch medicine types');
+    }
+
+    if (Array.isArray(data)) {
+      return data
+        .map((item) => (typeof item === 'string' ? item : item?.medicine_type))
+        .filter((name): name is string => typeof name === 'string' && name.trim().length > 0);
+    }
+
+    const types = data.types ?? data.data ?? [];
+    if (!Array.isArray(types)) {
+      return [];
+    }
+
+    return types
+      .map((item: unknown) => (typeof item === 'string' ? item : (item as { medicine_type?: string })?.medicine_type))
+      .filter((name): name is string => typeof name === 'string' && name.trim().length > 0);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Network error';
+    throw new Error(msg);
   }
 };

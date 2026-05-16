@@ -42,6 +42,14 @@ class MedicineTypeController:
         return jsonify(docs), 200
 
     @staticmethod
+    def list_types():
+        """Public list of medicine types for patient app dropdown."""
+        from app.models.medicine_type_model import MedicineTypeModel
+
+        types = MedicineTypeModel.get_type_names()
+        return jsonify({"types": types}), 200
+
+    @staticmethod
     def delete_awareness(medicine_type):
         from app.models.medicine_type_model import MedicineTypeModel
 

@@ -21,6 +21,26 @@ class MedicineTypeModel:
         return docs
 
     @staticmethod
+    def get_type_names():
+        """Distinct medicine_type values for patient dropdown (always from DB)."""
+        cursor = mongo.db.medicine_types.find(
+            {"medicine_type": {"$exists": True, "$ne": ""}},
+            {"medicine_type": 1, "_id": 0},
+        )
+        names = []
+        seen = set()
+        for doc in cursor:
+            name = (doc.get("medicine_type") or "").strip()
+            if not name:
+                continue
+            key = name.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            names.append(name)
+        return sorted(names, key=str.lower)
+
+    @staticmethod
     def upsert_awareness(data: dict):
         """
         Create or update awareness info for a medicine type

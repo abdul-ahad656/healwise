@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required
 from app.controllers.health_tips_controller import (
     add_tip,
     get_tips,
+    list_categories,
     deactivate_tip,
     update_tip,
     delete_tip,
@@ -19,7 +20,12 @@ def create_tip():
         return {"error": "Admin only"}, 403
     return add_tip()
 
-# Patient / All → View tips
+@health_tips_bp.get("/categories")
+@jwt_required()
+def view_categories():
+    return list_categories()
+
+
 @health_tips_bp.get("/")
 @jwt_required()
 def view_tips():

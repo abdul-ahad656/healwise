@@ -37,16 +37,21 @@ class HealthTipModel:
         return mongo.db[HealthTipModel.COLLECTION].insert_one(tip)
 
     @staticmethod
-    def get_active_tips(language="en", disease=None):
+    def get_active_tips(language="en", disease=None, tip_type=None):
         query = {
             "active": True,
-            "language": language
+            "language": language,
         }
 
-        if disease:
+        if tip_type == "general":
+            query["type"] = "general"
+        elif tip_type == "disease" and disease:
+            query["type"] = "disease"
+            query["disease"] = disease
+        elif disease:
             query["$or"] = [
                 {"type": "general"},
-                {"type": "disease", "disease": disease}
+                {"type": "disease", "disease": disease},
             ]
 
         tips = list(mongo.db[HealthTipModel.COLLECTION].find(query))
@@ -55,6 +60,49 @@ class HealthTipModel:
             tip["_id"] = str(tip["_id"])
 
         return tips
+
+    @staticmethod
+    def get_category_filters(language="en"):
+        """Dropdown options from active tips (updates when admin adds content)."""
+        cursor = mongo.db[HealthTipModel.COLLECTION].find(
+            {"active": True, "language": language},
+            {"type": 1, "disease": 1},
+        )
+
+        has_general = False
+        diseases = set()
+
+        for doc in cursor:
+            t = doc.get("type")
+            if t == "general":
+                has_general = True
+            elif t == "disease":
+                name = (doc.get("disease") or "").strip()
+                if name:
+                    diseases.add(name)
+
+        categories = []
+        if has_general:
+            categories.append(
+                {
+                    "key": "general",
+                    "label": "General Health",
+                    "type": "general",
+                    "disease": None,
+                }
+            )
+
+        for disease_name in sorted(diseases, key=str.lower):
+            categories.append(
+                {
+                    "key": f"disease:{disease_name}",
+                    "label": disease_name,
+                    "type": "disease",
+                    "disease": disease_name,
+                }
+            )
+
+        return categories
 
     @staticmethod
     def deactivate_tip(tip_id):
