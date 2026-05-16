@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  TextInput, 
-  Pressable, 
-  ScrollView, 
-  SafeAreaView, 
+import {
+  StyleSheet,
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  ScrollView,
   ActivityIndicator,
   Platform,
   NativeModules,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, Mic, MicOff, Search, Info } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
@@ -21,13 +23,13 @@ import { useTranslation } from 'react-i18next';
 
 export default function SymptomChecker() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const { t } = useTranslation();
   const [symptoms, setSymptoms] = useState('');
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isVoiceSupported = Platform.OS === 'ios' || Platform.OS === 'android';
-  /** Android registers the native module as `RCTVoice`; iOS as `Voice`. Library expects `Voice` unless patched. */
   const isVoiceNativeLinked = useMemo(
     () =>
       isVoiceSupported &&
@@ -36,16 +38,18 @@ export default function SymptomChecker() {
   );
 
   useEffect(() => {
-    if (!isVoiceSupported || !isVoiceNativeLinked) return;
+    if (!isVoiceSupported || !isVoiceNativeLinked || !isFocused) return;
     Voice.onSpeechStart = () => setIsListening(true);
     Voice.onSpeechEnd = () => setIsListening(false);
     Voice.onSpeechError = (e) => {
-      setError(t("speech_error"));
-      setIsListening(false);
-      console.error(e);
+      if (isFocused) {
+        setError(t("speech_error"));
+        setIsListening(false);
+        console.error(e);
+      }
     };
     Voice.onSpeechResults = (e: SpeechResultsEvent) => {
-      if (e.value && e.value[0]) {
+      if (isFocused && e.value && e.value[0]) {
         setSymptoms((prev) => prev + (prev ? " " : "") + e.value![0]);
       }
     };
@@ -63,7 +67,16 @@ export default function SymptomChecker() {
           } catch {}
         });
     };
-  }, [isVoiceSupported, isVoiceNativeLinked]);
+  }, [isVoiceSupported, isVoiceNativeLinked, isFocused]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        setSymptoms('');
+        setError(null);
+      };
+    }, [])
+  );
 
   const toggleListening = async () => {
     try {

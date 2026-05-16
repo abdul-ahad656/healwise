@@ -94,6 +94,7 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    marginBottom: 16,
   },
   cardTitle: { fontSize: 16, fontWeight: '800', color: '#111827', marginBottom: 10 },
   radioRow: {

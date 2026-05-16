@@ -14,8 +14,7 @@ import {
   Pill,
   Shield,
   BookOpen,
-  Video,
-  FileText
+  Video
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
@@ -59,20 +58,12 @@ export default function HomeDashboard() {
       route: '/(patient)/health-tips'
     },
     {
-      icon: FileText,
-      titleKey: 'home_prescription_title',
-      subtitleKey: 'home_prescription_subtitle',
-      descKey: 'home_prescription_desc',
-      color: '#06b6d4',
-      route: '/(patient)/prescriptions'
-    },
-    {
       icon: Video,
       titleKey: 'home_doctor_title',
       subtitleKey: 'home_doctor_subtitle',
       descKey: 'home_doctor_desc',
       color: '#a855f7',
-      route: '/consult-doctor'
+      route: '/(patient)/consult-doctor'
     }
   ];
 

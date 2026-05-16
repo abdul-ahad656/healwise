@@ -1,26 +1,4 @@
-// import { StyleSheet } from 'react-native';
-// import { ThemedText } from '@/components/themed-text';
-// import { ThemedView } from '@/components/themed-view';
-
-// export default function MedicineCompareScreen() {
-//   return (
-//     <ThemedView style={styles.container}>
-//       <ThemedText type="title">Medicine Compare</ThemedText>
-//       <ThemedText>Compare medicines and prices.</ThemedText>
-//     </ThemedView>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     alignItems: 'center',
-//     justifyContent: 'center',
-//     padding: 20,
-//   },
-// });
-
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -28,24 +6,122 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
+  Platform,
+  NativeModules,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Search, DollarSign, Star, Info } from 'lucide-react-native';
+import { useIsFocused } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
+import { ArrowLeft, Search, DollarSign, Star, Info, Mic, MicOff } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { compareMedicines, CompareResult } from '@/services/medicineService';
 import { useTranslation } from 'react-i18next';
+import Voice, { SpeechResultsEvent } from '@react-native-voice/voice';
 
 export default function MedicineComparison() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<CompareResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
   const { t } = useTranslation();
+
+  const isVoiceSupported = Platform.OS === 'ios' || Platform.OS === 'android';
+  const isVoiceNativeLinked = useMemo(
+    () =>
+      isVoiceSupported &&
+      (NativeModules.RCTVoice != null || NativeModules.Voice != null),
+    [isVoiceSupported]
+  );
+
+  useEffect(() => {
+    if (!isVoiceSupported || !isVoiceNativeLinked || !isFocused) return;
+
+    Voice.onSpeechStart = () => {
+      setIsListening(true);
+    };
+
+    Voice.onSpeechEnd = () => {
+      setIsListening(false);
+    };
+
+    Voice.onSpeechResults = (e: SpeechResultsEvent) => {
+      if (isFocused && e.value && e.value[0]) {
+        setSearchTerm(e.value[0]);
+      }
+    };
+
+    Voice.onSpeechError = (e: any) => {
+      if (isFocused) {
+        setIsListening(false);
+        console.error('Voice error:', e);
+      }
+    };
+
+    return () => {
+      Voice.destroy()
+        .then(() => {
+          try {
+            Voice.removeAllListeners();
+          } catch {}
+        })
+        .catch(() => {
+          try {
+            Voice.removeAllListeners();
+          } catch {}
+        });
+    };
+  }, [isVoiceSupported, isVoiceNativeLinked, isFocused]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        setSearchTerm('');
+        setResults(null);
+        setError(null);
+      };
+    }, [])
+  );
+
+  const startListening = async () => {
+    try {
+      if (!isVoiceSupported) {
+        Alert.alert('Error', 'Voice input is not supported on this platform');
+        return;
+      }
+      if (!isVoiceNativeLinked) {
+        Alert.alert('Error', 'Voice recognition is not available');
+        return;
+      }
+      setError(null);
+      await Voice.start('en-US');
+    } catch (err) {
+      console.error('Start listening error:', err);
+      Alert.alert('Error', 'Failed to start voice recognition');
+    }
+  };
+
+  const stopListening = async () => {
+    try {
+      await Voice.stop();
+    } catch (err) {
+      console.error('Stop listening error:', err);
+    }
+  };
+
+  const handleMicPress = async () => {
+    if (isListening) {
+      await stopListening();
+    } else {
+      await startListening();
+    }
+  };
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) return;
@@ -101,17 +177,41 @@ export default function MedicineComparison() {
       >
         <Card style={styles.card}>
           <Text style={styles.cardTitle}>{t("medicine_find_alternatives")}</Text>
-          
-          <View style={styles.inputWrapper}>
+
+          <View style={[styles.inputWrapper, isListening && styles.inputWrapperActive]}>
             <Search size={18} color="#9CA3AF" style={styles.inputIcon} />
             <TextInput
-              placeholder={t("medicine_search_placeholder")}
-              placeholderTextColor="#9CA3AF"
+              placeholder={isListening ? "Listening..." : t("medicine_search_placeholder")}
+              placeholderTextColor={isListening ? "#3b82f6" : "#9CA3AF"}
               value={searchTerm}
               onChangeText={setSearchTerm}
               style={styles.input}
+              editable={!loading}
             />
+            <Pressable
+              onPress={handleMicPress}
+              disabled={!isVoiceNativeLinked}
+              style={({ pressed }) => [
+                styles.micButton,
+                isListening && styles.micButtonActive,
+                !isVoiceNativeLinked && styles.micButtonDisabled,
+                pressed && { opacity: 0.7 }
+              ]}
+            >
+              {isListening ? (
+                <Mic size={18} color="white" />
+              ) : (
+                <MicOff size={18} color="#9CA3AF" />
+              )}
+            </Pressable>
           </View>
+
+          {!isVoiceNativeLinked && isVoiceSupported && (
+            <Text style={styles.voiceUnavailableHint}>Voice recognition not available</Text>
+          )}
+          {isListening && (
+            <Text style={styles.listeningHint}>🎤 Listening...</Text>
+          )}
 
           <Pressable
             onPress={handleSearch}
@@ -249,8 +349,36 @@ const styles = StyleSheet.create({
     height: 52,
     marginBottom: 16,
   },
+  inputWrapperActive: {
+    borderColor: '#3b82f6',
+    backgroundColor: '#eff6ff',
+  },
   inputIcon: { marginRight: 10 },
   input: { flex: 1, fontSize: 15, color: '#111827' },
+  micButton: {
+    padding: 8,
+    marginLeft: 8,
+    borderRadius: 8,
+  },
+  micButtonActive: {
+    backgroundColor: '#3b82f6',
+  },
+  micButtonDisabled: {
+    opacity: 0.5,
+  },
+  voiceUnavailableHint: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  listeningHint: {
+    textAlign: 'center',
+    color: '#3b82f6',
+    fontSize: 12,
+    marginBottom: 15,
+    fontWeight: '500',
+  },
   buttonWrapper: { borderRadius: 12, overflow: 'hidden' },
   searchButton: {
     height: 52,
