@@ -42,7 +42,7 @@ function categoryIcon(type: string) {
 
 export default function HealthEducation() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [categories, setCategories] = useState<HealthTipCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<HealthTipCategory | null>(null);
@@ -71,7 +71,7 @@ export default function HealthEducation() {
     } finally {
       setLoadingCategories(false);
     }
-  }, [t]);
+  }, [t, i18n.language]);
 
   useEffect(() => {
     loadCategories(true);
@@ -106,7 +106,7 @@ export default function HealthEducation() {
     };
 
     fetchTips();
-  }, [selectedCategory, t]);
+  }, [selectedCategory, i18n.language, t]);
 
   const filteredCategories = useMemo(() => {
     const q = categorySearch.trim().toLowerCase();

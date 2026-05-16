@@ -1,6 +1,6 @@
 import { API_BASE_URL } from './config';
 import AuthStore from './authStore';
-import i18n from '@/i18n';
+import { isUrduLocale, withLangQuery } from '@/utils/locale';
 
 export interface HealthTip {
   _id: string;
@@ -38,7 +38,7 @@ function authHeaders(): HeadersInit {
 export const getHealthTipCategories = async (): Promise<HealthTipCategory[]> => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/health-tips/categories?language=en`,
+      withLangQuery(`${API_BASE_URL}/health-tips/categories?language=en`),
       { method: 'GET', headers: authHeaders() }
     );
 
@@ -73,7 +73,7 @@ export const getHealthTips = async (
       }
     }
 
-    if (i18n.language === 'ur') {
+    if (isUrduLocale()) {
       queryParams.append('lang', 'ur');
     }
 

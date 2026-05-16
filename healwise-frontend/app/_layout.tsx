@@ -1,11 +1,13 @@
+import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
-
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import i18n from '@/i18n';
+import AuthStore from '@/services/authStore';
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
@@ -14,6 +16,13 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    const user = AuthStore.getUser();
+    if (user?.language === 'ur' || user?.language === 'en') {
+      i18n.changeLanguage(user.language);
+    }
+  }, []);
 
   return (
     <SafeAreaProvider>

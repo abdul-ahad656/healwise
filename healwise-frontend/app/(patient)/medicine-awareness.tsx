@@ -40,8 +40,18 @@ import {
 import { useTranslation } from 'react-i18next';
 
 function normalizeList(value: string[] | string | undefined | null): string[] {
-  if (Array.isArray(value)) return value.filter(Boolean);
-  if (typeof value === 'string' && value.trim()) return [value];
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === 'string' && !!item.trim())
+      .flatMap((item) => {
+        const lines = item.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+        return lines.length > 1 ? lines : [item.trim()];
+      });
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const lines = value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    return lines.length > 1 ? lines : [value.trim()];
+  }
   return [];
 }
 
@@ -114,7 +124,7 @@ function buildSections(awareness: MedicineTypeAwareness): AwarenessSection[] {
 
 export default function MedicineSafety() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [selectedType, setSelectedType] = useState<string>('');
   const [medicineTypes, setMedicineTypes] = useState<string[]>([]);
@@ -177,7 +187,7 @@ export default function MedicineSafety() {
     };
 
     fetchAwareness();
-  }, [selectedType, t]);
+  }, [selectedType, i18n.language, t]);
 
   const filteredTypes = useMemo(() => {
     const q = typeSearch.trim().toLowerCase();

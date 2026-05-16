@@ -1,6 +1,6 @@
 from flask import request, jsonify
 from app.services.medicine_type_service import MedicineTypeService
-from app.utils.translate_utils import translate_to_urdu, translate_list_to_urdu
+from app.utils.translate_utils import translate_to_urdu, translate_awareness_field
 
 
 class MedicineTypeController:
@@ -13,12 +13,13 @@ class MedicineTypeController:
         # If translation requested and the base call succeeded, translate fields to Urdu
         if lang == "ur" and status == 200 and isinstance(result, dict) and "error" not in result:
             result = result.copy()
+            result["medicine_type"] = translate_to_urdu(result.get("medicine_type", ""))
             result["description"] = translate_to_urdu(result.get("description", ""))
-            result["common_uses"] = translate_list_to_urdu(result.get("common_uses"))
-            result["how_to_use"] = translate_list_to_urdu(result.get("how_to_use"))
-            result["precautions"] = translate_list_to_urdu(result.get("precautions"))
-            result["side_effects"] = translate_list_to_urdu(result.get("side_effects"))
-            result["warnings"] = translate_list_to_urdu(result.get("warnings"))
+            result["common_uses"] = translate_awareness_field(result.get("common_uses"))
+            result["how_to_use"] = translate_awareness_field(result.get("how_to_use"))
+            result["precautions"] = translate_awareness_field(result.get("precautions"))
+            result["side_effects"] = translate_awareness_field(result.get("side_effects"))
+            result["warnings"] = translate_awareness_field(result.get("warnings"))
             # disclaimer is static English text; translate too for consistency
             result["disclaimer"] = translate_to_urdu(result.get("disclaimer", ""))
 

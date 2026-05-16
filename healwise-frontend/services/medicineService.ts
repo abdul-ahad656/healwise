@@ -1,6 +1,6 @@
 import { API_BASE_URL } from './config';
 import AuthStore from './authStore';
-import i18n from '@/i18n';
+import { withLangQuery } from '@/utils/locale';
 
 export interface Medicine {
   name: string;
@@ -96,9 +96,10 @@ export const getMedicineTypeAwareness = async (
   medicineType: string
 ): Promise<MedicineTypeAwareness> => {
   try {
-    const langParam = i18n.language === 'ur' ? '?lang=ur' : '';
     const response = await fetch(
-      `${API_BASE_URL}/medicine-awareness/type-awareness/${encodeURIComponent(medicineType)}${langParam}`,
+      withLangQuery(
+        `${API_BASE_URL}/medicine-awareness/type-awareness/${encodeURIComponent(medicineType)}`
+      ),
       {
         method: 'GET',
       }

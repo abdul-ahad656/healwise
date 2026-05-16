@@ -54,5 +54,40 @@ def translate_list_to_urdu(items: Any) -> List[str]:
   """
   if not isinstance(items, list):
     return []
-  return [translate_to_urdu(x) for x in items]
+  return [translate_to_urdu(x) for x in items if x]
+
+
+def translate_awareness_field(value: Any) -> Any:
+  """
+  Translate medicine-awareness fields stored as either a list or a single
+  string (admin form saves multiline text). Preserves shape for the client.
+  """
+  if value is None:
+    return ""
+
+  if isinstance(value, list):
+    out: List[str] = []
+    for item in value:
+      if not item:
+        continue
+      if isinstance(item, str) and "\n" in item:
+        out.extend(
+          translate_to_urdu(ln)
+          for ln in item.splitlines()
+          if ln.strip()
+        )
+      else:
+        out.append(translate_to_urdu(item))
+    return out
+
+  if isinstance(value, str):
+    text = value.strip()
+    if not text:
+      return ""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if len(lines) > 1:
+      return [translate_to_urdu(ln) for ln in lines]
+    return translate_to_urdu(text)
+
+  return translate_to_urdu(str(value))
 

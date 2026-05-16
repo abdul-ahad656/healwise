@@ -53,7 +53,13 @@ def get_tips():
 
 def list_categories():
     language = request.args.get("language", "en")
+    lang_pref = request.args.get("lang")
     categories = HealthTipModel.get_category_filters(language)
+
+    if lang_pref == "ur":
+        for cat in categories:
+            cat["label"] = translate_to_urdu(cat.get("label", ""))
+
     return jsonify({"categories": categories}), 200
 
 
