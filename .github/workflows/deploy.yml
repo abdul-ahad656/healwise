@@ -126,6 +126,7 @@ name: Build, Test & Deploy to Cloud Run
 on:
   push:
     branches:
+      - main
       - production
     paths:
       - 'backend/**'
@@ -147,16 +148,16 @@ env:
   ARTIFACT_REPO: healwise-repo
   REGISTRY: us-central1-docker.pkg.dev
 
-# -------------------------
+# =========================
 # 🧪 TEST JOB
-# -------------------------
+# =========================
 jobs:
   test:
-    name: Run Tests
+    name: Run Tests & Lint
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -171,18 +172,20 @@ jobs:
           pip install -r backend/requirements.txt
           pip install pytest pytest-cov flake8
 
-      - name: Lint
-        run: flake8 backend/ --count --select=E9,F63,F7,F82 --show-source --statistics
+      - name: Lint code
+        run: |
+          flake8 backend/ --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Run tests
-        run: pytest backend/tests -v --cov=backend
+        run: |
+          pytest backend/tests -v --cov=backend
 
 
-# -------------------------
-# 🚀 BUILD & DEPLOY
-# -------------------------
+# =========================
+# 🚀 BUILD & DEPLOY JOB
+# =========================
   deploy:
-    name: Deploy to Cloud Run
+    name: Build & Deploy to Cloud Run
     runs-on: ubuntu-latest
     needs: test
 
@@ -194,11 +197,11 @@ jobs:
       id-token: write
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
       # -------------------------
-      # 🔐 Authenticate GCP (WIF)
+      # 🔐 Authenticate with GCP (WIF)
       # -------------------------
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -206,15 +209,18 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-      - name: Setup gcloud
+      - name: Setup gcloud CLI
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Docker for Artifact Registry
+      # -------------------------
+      # 🐳 Docker auth for Artifact Registry
+      # -------------------------
+      - name: Configure Docker authentication
         run: |
           gcloud auth configure-docker ${{ env.REGISTRY }}
 
       # -------------------------
-      # ⚡ Docker Build (CACHED)
+      # ⚡ Docker Build (WITH CACHE)
       # -------------------------
       - name: Build Docker image
         run: |
@@ -258,20 +264,20 @@ jobs:
               CLOUDINARY_API_SECRET=CLOUDINARY_API_SECRET:latest
 
       # -------------------------
-      # 📡 Get Service URL
+      # 📡 Get Cloud Run URL
       # -------------------------
-      - name: Get Cloud Run URL
+      - name: Get service URL
         id: cloudrun
         run: |
           URL=$(gcloud run services describe ${{ env.IMAGE_NAME }} \
             --region ${{ env.REGION }} \
             --format='value(status.url)')
           echo "SERVICE_URL=$URL" >> $GITHUB_OUTPUT
-          echo "🚀 Deployed at: $URL"
+          echo "Deployed at: $URL"
 
       # -------------------------
-      # 🧪 Health Check
+      # 🧪 Health Check (FAIL SAFE)
       # -------------------------
-      - name: Health Check
+      - name: Health check
         run: |
           curl -f ${{ steps.cloudrun.outputs.SERVICE_URL }}/health || exit 1
