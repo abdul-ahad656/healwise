@@ -1,0 +1,64 @@
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/healwise-backend:$SHORT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/healwise-backend:latest'
+      - '.'
+
+  # Step 2: Push the image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/healwise-backend:$SHORT_SHA'
+
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    id: 'deploy'
+    env:
+      - 'CLOUDSDK_COMPUTE_REGION=us-central1'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=healwise-backend'
+    args:
+      - run
+      - '--filename=.'
+      - '--image=gcr.io/$PROJECT_ID/healwise-backend:$SHORT_SHA'
+      - '--location=us-central1'
+      - '--config=cloudbuild-deploy.yaml'
+
+# Alternative: Deploy directly with gcloud
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'deploy-cloudrun'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'healwise-backend'
+      - '--image=gcr.io/$PROJECT_ID/healwise-backend:$SHORT_SHA'
+      - '--platform=managed'
+      - '--region=us-central1'
+      - '--allow-unauthenticated'
+      - '--memory=1Gi'
+      - '--cpu=1'
+      - '--timeout=600'
+      - '--max-instances=100'
+      - '--set-env-vars=FLASK_ENV=production'
+      - '--update-secrets=MONGO_URI=MONGO_URI:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest,SECRET_KEY=SECRET_KEY:latest,CLOUDINARY_CLOUD_NAME=CLOUDINARY_CLOUD_NAME:latest,CLOUDINARY_API_KEY=CLOUDINARY_API_KEY:latest,CLOUDINARY_API_SECRET=CLOUDINARY_API_SECRET:latest'
+
+images:
+  - 'gcr.io/$PROJECT_ID/healwise-backend:$SHORT_SHA'
+  - 'gcr.io/$PROJECT_ID/healwise-backend:latest'
+
+# Only build on main and production branches
+onPush:
+  branch: '^(main|production)$'
+
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+# Timeout for the build
+timeout: 3600s
