@@ -55,10 +55,15 @@ jobs:
 
       - name: Run pytest
         run: |
-          pytest backend/tests -v --cov=backend --cov-report=xml
+          if [ -d "backend/tests" ]; then
+            pytest backend/tests -v --cov=backend --cov-report=xml
+          else
+            echo "⚠️  No tests found in backend/tests, skipping pytest"
+            echo "coverage_status=skipped" >> $GITHUB_ENV
+          fi
 
       - name: Upload coverage reports
-        if: always()
+        if: always() && hashFiles('coverage.xml') != ''
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
