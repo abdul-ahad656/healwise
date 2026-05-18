@@ -1,7 +1,7 @@
+import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from .extensions import mongo, jwt
-from .config import Config
 
 from .routes.auth_routes import auth_bp
 from .routes.symptom_routes import symptom_bp
@@ -18,9 +18,19 @@ from app.routes.medicine_type_routes import medicine_type_bp
 from app.routes.prescription_routes import prescription_bp
 
 
+def get_config():
+    """Get configuration based on environment."""
+    from .config_prod import config
+    env = os.getenv('FLASK_ENV', 'development')
+    return config.get(env, config['default'])
+
+
 def create_app():
     app = Flask(__name__, instance_relative_config=False)
-    app.config.from_object(Config)
+
+    # Load configuration based on environment
+    config_class = get_config()
+    app.config.from_object(config_class)
 
     CORS(app)
     mongo.init_app(app)
@@ -40,10 +50,9 @@ def create_app():
     app.register_blueprint(medicine_type_bp,url_prefix="/api/medicine-awareness")
     app.register_blueprint(prescription_bp, url_prefix="/api/prescriptions")
 
-
-
     @app.route("/health")
     def health():
         return jsonify({"status": "ok"}), 200
 
     return app
+
