@@ -126,13 +126,12 @@ jobs:
             --max-instances 20 \
             --timeout 300 \
             --set-env-vars FLASK_ENV=production \
-            --set-secrets \
-              MONGO_URI=MONGO_URI:latest,\
-              JWT_SECRET_KEY=JWT_SECRET_KEY:latest,\
-              SECRET_KEY=SECRET_KEY:latest,\
-              CLOUDINARY_CLOUD_NAME=CLOUDINARY_CLOUD_NAME:latest,\
-              CLOUDINARY_API_KEY=CLOUDINARY_API_KEY:latest,\
-              CLOUDINARY_API_SECRET=CLOUDINARY_API_SECRET:latest
+            --set-secrets MONGO_URI=MONGO_URI:latest \
+            --set-secrets JWT_SECRET_KEY=JWT_SECRET_KEY:latest \
+            --set-secrets SECRET_KEY=SECRET_KEY:latest \
+            --set-secrets CLOUDINARY_CLOUD_NAME=CLOUDINARY_CLOUD_NAME:latest \
+            --set-secrets CLOUDINARY_API_KEY=CLOUDINARY_API_KEY:latest \
+            --set-secrets CLOUDINARY_API_SECRET=CLOUDINARY_API_SECRET:latest
 
       - name: Get Cloud Run service URL
         id: service-url
