@@ -1,126 +1,3 @@
-# name: Build and Deploy to Cloud Run
-
-# on:
-#   push:
-#     branches:
-#       - main
-#       - production
-#     paths:
-#       - 'backend/**'
-#       - 'Dockerfile'
-#       - '.dockerignore'
-#       - '.github/workflows/deploy.yml'
-#   pull_request:
-#     branches:
-#       - main
-#       - production
-#     paths:
-#       - 'backend/**'
-#       - 'Dockerfile'
-#       - '.dockerignore'
-
-# env:
-#   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-#   GCP_REGION: us-central1
-#   IMAGE_NAME: healwise-backend
-#   REGISTRY_HOSTNAME: us-central1-docker.pkg.dev
-#   ARTIFACT_REPO: healwise-repo
-
-# jobs:
-#   setup-build-deploy:
-#     name: Setup, Build, and Deploy
-#     runs-on: ubuntu-latest
-
-#     permissions:
-#       contents: read
-#       id-token: write
-
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@v4
-
-#       - name: Authenticate to Google Cloud
-#         uses: google-github-actions/auth@v2
-#         with:
-#           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-#           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
-
-#       - name: Set up Cloud SDK
-#         uses: google-github-actions/setup-gcloud@v2
-
-#       - name: Configure Docker to use gcloud as credential helper
-#         run: |
-#           gcloud auth configure-docker
-
-#       - name: Build Docker image
-#         run: |
-#           docker build \
-#             --tag "${{ env.REGISTRY_HOSTNAME }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" \
-#             --tag "${{ env.REGISTRY_HOSTNAME }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest" \
-#             .
-
-#       - name: Push Docker image to Google Container Registry
-#         run: |
-#           docker push "${{ env.REGISTRY_HOSTNAME }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
-#           docker push "${{ env.REGISTRY_HOSTNAME }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest"
-
-#       - name: Deploy to Cloud Run
-#         run: |
-#           gcloud run deploy ${{ env.IMAGE_NAME }} \
-#             --image "${{ env.REGISTRY_HOSTNAME }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" \
-#             --platform managed \
-#             --region ${{ env.GCP_REGION }} \
-#             --allow-unauthenticated \
-#             --memory 1Gi \
-#             --cpu 1 \
-#             --timeout 600 \
-#             --max-instances 100 \
-#             --set-env-vars FLASK_ENV=production \
-#             --set-secrets MONGO_URI=MONGO_URI:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest,SECRET_KEY=SECRET_KEY:latest,CLOUDINARY_CLOUD_NAME=CLOUDINARY_CLOUD_NAME:latest,CLOUDINARY_API_KEY=CLOUDINARY_API_KEY:latest,CLOUDINARY_API_SECRET=CLOUDINARY_API_SECRET:latest
-
-#       - name: Get Cloud Run service URL
-#         run: |
-#           SERVICE_URL=$(gcloud run services describe ${{ env.IMAGE_NAME }} \
-#             --platform managed \
-#             --region ${{ env.GCP_REGION }} \
-#             --format 'value(status.url)')
-#           echo "Service deployed at: $SERVICE_URL"
-#           echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
-
-#   test:
-#     name: Run Tests (Optional)
-#     runs-on: ubuntu-latest
-#     if: github.event_name == 'pull_request'
-
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@v4
-
-#       - name: Set up Python
-#         uses: actions/setup-python@v4
-#         with:
-#           python-version: '3.11'
-#           cache: 'pip'
-
-#       - name: Install dependencies
-#         run: |
-#           python -m pip install --upgrade pip
-#           pip install -r backend/requirements.txt
-#           pip install pytest pytest-cov
-
-#       - name: Lint with flake8
-#         run: |
-#           pip install flake8
-#           flake8 backend/ --count --select=E9,F63,F7,F82 --show-source --statistics
-#         continue-on-error: true
-
-#       - name: Run tests
-#         run: |
-#           cd backend
-#           pytest --cov=app tests/ -v
-#         continue-on-error: true
-
-
 name: Build, Test & Deploy to Cloud Run
 
 on:
@@ -148,10 +25,10 @@ env:
   ARTIFACT_REPO: healwise-repo
   REGISTRY: us-central1-docker.pkg.dev
 
-# =========================
-# 🧪 TEST JOB
-# =========================
 jobs:
+  # ============================================================
+  # TEST JOB - Runs on all PRs and pushes to main/production
+  # ============================================================
   test:
     name: Run Tests & Lint
     runs-on: ubuntu-latest
@@ -172,24 +49,30 @@ jobs:
           pip install -r backend/requirements.txt
           pip install pytest pytest-cov flake8
 
-      - name: Lint code
+      - name: Lint code with flake8
         run: |
           flake8 backend/ --count --select=E9,F63,F7,F82 --show-source --statistics
 
-      - name: Run tests
+      - name: Run pytest
         run: |
-          pytest backend/tests -v --cov=backend
+          pytest backend/tests -v --cov=backend --cov-report=xml
 
+      - name: Upload coverage reports
+        if: always()
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
 
-# =========================
-# 🚀 BUILD & DEPLOY JOB
-# =========================
+  # ============================================================
+  # BUILD & DEPLOY JOB - Only runs on production branch
+  # ============================================================
   deploy:
     name: Build & Deploy to Cloud Run
     runs-on: ubuntu-latest
     needs: test
 
-    # ONLY deploy from production branch
     if: github.ref == 'refs/heads/production'
 
     permissions:
@@ -200,47 +83,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # -------------------------
-      # 🔐 Authenticate with GCP (WIF)
-      # -------------------------
-      - name: Authenticate to Google Cloud
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-      - name: Setup gcloud CLI
+      - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      # -------------------------
-      # 🐳 Docker auth for Artifact Registry
-      # -------------------------
-      - name: Configure Docker authentication
+      - name: Configure Docker authentication for Artifact Registry
         run: |
           gcloud auth configure-docker ${{ env.REGISTRY }}
 
-      # -------------------------
-      # ⚡ Docker Build (WITH CACHE)
-      # -------------------------
-      - name: Build Docker image
+      - name: Build Docker image with layer caching
         run: |
           docker build \
             --cache-from ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:latest \
-            -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:latest \
+            --tag ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --tag ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:latest \
             .
 
-      # -------------------------
-      # 📤 Push Image
-      # -------------------------
-      - name: Push Docker image
+      - name: Push Docker image to Artifact Registry
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:latest
 
-      # -------------------------
-      # 🚀 Deploy to Cloud Run
-      # -------------------------
       - name: Deploy to Cloud Run
         id: deploy
         run: |
@@ -249,8 +117,8 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --memory 1Gi \
-            --cpu 1 \
+            --memory 4Gi \
+            --cpu 2 \
             --concurrency 80 \
             --max-instances 20 \
             --timeout 300 \
@@ -263,21 +131,43 @@ jobs:
               CLOUDINARY_API_KEY=CLOUDINARY_API_KEY:latest,\
               CLOUDINARY_API_SECRET=CLOUDINARY_API_SECRET:latest
 
-      # -------------------------
-      # 📡 Get Cloud Run URL
-      # -------------------------
-      - name: Get service URL
-        id: cloudrun
+      - name: Get Cloud Run service URL
+        id: service-url
         run: |
-          URL=$(gcloud run services describe ${{ env.IMAGE_NAME }} \
+          SERVICE_URL=$(gcloud run services describe ${{ env.IMAGE_NAME }} \
             --region ${{ env.REGION }} \
             --format='value(status.url)')
-          echo "SERVICE_URL=$URL" >> $GITHUB_OUTPUT
-          echo "Deployed at: $URL"
+          echo "url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "✅ Service deployed at: $SERVICE_URL"
 
-      # -------------------------
-      # 🧪 Health Check (FAIL SAFE)
-      # -------------------------
-      - name: Health check
+      - name: Health check - Verify service is live
         run: |
-          curl -f ${{ steps.cloudrun.outputs.SERVICE_URL }}/health || exit 1
+          SERVICE_URL="${{ steps.service-url.outputs.url }}"
+          echo "🔍 Running health check against: $SERVICE_URL/health"
+          for i in {1..5}; do
+            if curl -f "$SERVICE_URL/health"; then
+              echo "✅ Health check passed!"
+              exit 0
+            fi
+            echo "⏳ Attempt $i/5 failed, retrying in 10 seconds..."
+            sleep 10
+          done
+          echo "❌ Health check failed after 5 attempts"
+          exit 1
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "🎉 Deployment Successful!"
+          echo "📍 Region: ${{ env.REGION }}"
+          echo "🖼️  Image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo "🌐 Service URL: ${{ steps.service-url.outputs.url }}"
+          echo "🔐 Secrets injected from Google Secret Manager"
+          echo "✅ Health check passed"
+
+      - name: Deployment failure notification
+        if: failure()
+        run: |
+          echo "❌ Deployment failed!"
+          echo "Check Cloud Run logs:"
+          echo "gcloud run services logs read ${{ env.IMAGE_NAME }} --region ${{ env.REGION }} --limit 50"
