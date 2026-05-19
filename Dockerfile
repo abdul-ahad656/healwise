@@ -32,11 +32,25 @@ COPY backend/ .
 ENV PATH=/root/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     FLASK_APP=main.py \
-    PORT=8080
+    PORT=8080 \
+    PYTHONHASHSEED=0 \
+    WORKERS=2
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Use gunicorn for production
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "wsgi:app"]
+# Use gunicorn with optimized settings for Cloud Run
+# Reduced workers (2) to fit in 2Gi memory with transformers library
+CMD exec gunicorn \
+    --bind 0.0.0.0:${PORT} \
+    --workers ${WORKERS} \
+    --worker-class sync \
+    --timeout 120 \
+    --keep-alive 5 \
+    --max-requests 1000 \
+    --max-requests-jitter 100 \
+    --access-logfile - \
+    --error-logfile - \
+    --log-level info \
+    wsgi:app
