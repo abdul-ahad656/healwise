@@ -84,26 +84,41 @@ def create_app():
 
     # ✅ EXTENSIONS
     CORS(app)
-    mongo.init_app(app)
-    jwt.init_app(app)
+    try:
+        mongo.init_app(app)
+    except Exception as e:
+        print(f"⚠️  MongoDB init warning: {e}")
+
+    try:
+        jwt.init_app(app)
+    except Exception as e:
+        print(f"⚠️  JWT init warning: {e}")
 
     # ✅ BLUEPRINTS
-    app.register_blueprint(auth_bp, url_prefix="/api/auth")
-    app.register_blueprint(symptom_bp, url_prefix="/api/symptoms")
-    app.register_blueprint(medicine_bp, url_prefix="/api/medicines")
-    app.register_blueprint(doctor_bp, url_prefix="/api/doctor")
-    app.register_blueprint(appointment_bp, url_prefix="/api/appointments")
-    app.register_blueprint(availability_bp, url_prefix="/api/availability")
-    app.register_blueprint(public_bp, url_prefix="/api/public")
-    app.register_blueprint(admin_bp, url_prefix="/api/admin")
-    app.register_blueprint(doctor_profile_bp, url_prefix="/api/doctor_profile")
-    app.register_blueprint(health_tips_bp, url_prefix="/api/health-tips")
-    app.register_blueprint(medicine_type_bp, url_prefix="/api/medicine-awareness")
-    app.register_blueprint(prescription_bp, url_prefix="/api/prescriptions")
+    try:
+        app.register_blueprint(auth_bp, url_prefix="/api/auth")
+        app.register_blueprint(symptom_bp, url_prefix="/api/symptoms")
+        app.register_blueprint(medicine_bp, url_prefix="/api/medicines")
+        app.register_blueprint(doctor_bp, url_prefix="/api/doctor")
+        app.register_blueprint(appointment_bp, url_prefix="/api/appointments")
+        app.register_blueprint(availability_bp, url_prefix="/api/availability")
+        app.register_blueprint(public_bp, url_prefix="/api/public")
+        app.register_blueprint(admin_bp, url_prefix="/api/admin")
+        app.register_blueprint(doctor_profile_bp, url_prefix="/api/doctor_profile")
+        app.register_blueprint(health_tips_bp, url_prefix="/api/health-tips")
+        app.register_blueprint(medicine_type_bp, url_prefix="/api/medicine-awareness")
+        app.register_blueprint(prescription_bp, url_prefix="/api/prescriptions")
+    except Exception as e:
+        print(f"⚠️  Blueprint registration warning: {e}")
 
     # ✅ HEALTH CHECK
     @app.route("/health")
     def health():
         return jsonify({"status": "ok"}), 200
+
+    @app.errorhandler(500)
+    def server_error(e):
+        print(f"❌ Server error: {e}")
+        return jsonify({"error": str(e)}), 500
 
     return app
