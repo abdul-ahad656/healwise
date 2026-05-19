@@ -1,19 +1,22 @@
 import os
 import json
-import torch
-import numpy as np
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from flask import current_app
 
-# Lazy load global objects
+# Lazy load global objects - DO NOT import torch/transformers at module level
 _tokenizer = None
 _model = None
 _id2label = None
+_torch = None
 
 def _load_model():
-    global _tokenizer, _model, _id2label
+    global _tokenizer, _model, _id2label, _torch
     if _tokenizer is not None and _model is not None:
         return
+
+    # Import heavy libraries only when first needed
+    import torch
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification
+    _torch = torch
 
     model_dir = current_app.config.get("ML_MODEL_DIR", "app/ml_model/clinicalbert_finetuned")
     # load label map
@@ -37,7 +40,7 @@ def _load_model():
 
     _tokenizer = AutoTokenizer.from_pretrained(model_dir)
     # Use device-aware loading
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda" if _torch.cuda.is_available() else "cpu"
     _model = AutoModelForSequenceClassification.from_pretrained(model_dir)
     _model.to(device)
     _model.eval()
@@ -47,16 +50,19 @@ def predict_symptoms(text: str, top_k: int = 3):
     Returns list of {label, score} sorted by score desc.
     """
     _load_model()
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    import numpy as np
+
+    device = "cuda" if _torch.cuda.is_available() else "cpu"
     inputs = _tokenizer(text, truncation=True, padding="max_length", max_length=128, return_tensors="pt")
     inputs = {k: v.to(device) for k, v in inputs.items()}
-    with torch.no_grad():
+    with _torch.no_grad():
         outputs = _model(**inputs)
         logits = outputs.logits
-        probs = torch.softmax(logits, dim=-1).cpu().numpy().flatten()
+        probs = _torch.softmax(logits, dim=-1).cpu().numpy().flatten()
     top_idx = np.argsort(probs)[::-1][:top_k]
     results = []
     for i in top_idx:
         label = _id2label.get(int(i), str(i))
         results.append({"label": label, "score": float(probs[int(i)])})
     return results
+
