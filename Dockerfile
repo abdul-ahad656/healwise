@@ -42,15 +42,4 @@ USER appuser
 
 # Use gunicorn with optimized settings for Cloud Run
 # Reduced workers (2) to fit in 2Gi memory with transformers library
-CMD exec gunicorn \
-    --bind 0.0.0.0:${PORT} \
-    --workers ${WORKERS} \
-    --worker-class sync \
-    --timeout 120 \
-    --keep-alive 5 \
-    --max-requests 1000 \
-    --max-requests-jitter 100 \
-    --access-logfile - \
-    --error-logfile - \
-    --log-level info \
-    wsgi:app
+CMD exec gunicorn --bind 0.0.0.0:8080 --workers 2 --worker-class sync --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile - --log-level info wsgi:app
