@@ -20,9 +20,8 @@ from app.routes.prescription_routes import prescription_bp
 
 def get_config():
     """Get configuration based on environment."""
-    from .config_prod import config
-    env = os.getenv('FLASK_ENV', 'development')
-    return config.get(env, config['default'])
+    from .config import Config
+    return Config
 
 
 def create_app():
