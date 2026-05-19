@@ -39,4 +39,4 @@ RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Use gunicorn for production
-CMD exec gunicorn --bind 0.0.0.0:${PORT} --workers 4 --worker-class sync --timeout 60 --access-logfile - --error-logfile - wsgi:app
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "wsgi:app"]
