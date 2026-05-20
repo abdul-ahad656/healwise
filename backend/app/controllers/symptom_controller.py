@@ -43,29 +43,34 @@ from bson.objectid import ObjectId
 from app.extensions import mongo
 from app.models.user_model import find_user_by_id
 from app.models.symptom_model import get_user_symptoms
-from app.services.symptom_service import process_and_store_symptom
+from app.services.symptom_service import process_and_store_symptom, SymptomServiceError
+from app.services.hf_service import HFServiceError
+
 
 def submit_symptoms():
     user_id = get_jwt_identity()
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
-    text = data.get("text")
+    text = (data.get("text") or "").strip()
     if not text:
         return jsonify({"error": "Symptoms text is required"}), 400
 
-    # Fetch user language
     user = find_user_by_id(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
     language = user.get("language", "en")
 
-    # 🔥 AI + Save in ONE step
-    result = process_and_store_symptom(
-        user_id=user_id,
-        text=text,
-        language=language
-    )
+    try:
+        result = process_and_store_symptom(
+            user_id=user_id,
+            text=text,
+            language=language,
+        )
+    except HFServiceError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except SymptomServiceError as exc:
+        return jsonify({"error": str(exc)}), 503
 
     return jsonify({
         "message": "Symptoms analyzed successfully",
