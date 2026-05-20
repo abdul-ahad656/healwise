@@ -156,7 +156,7 @@ export default function HealthEducation() {
             </Pressable>
             <View style={styles.headerTextContainer}>
               <Text style={styles.headerTitle}>{t('health_education_title')}</Text>
-              <Text style={styles.headerSubtitle}>{t('health_education_subtitle')}</Text>
+              {/* <Text style={styles.headerSubtitle}>{t('health_education_subtitle')}</Text> */}
             </View>
           </View>
         </SafeAreaView>

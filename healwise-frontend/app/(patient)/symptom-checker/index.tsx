@@ -138,7 +138,7 @@ export default function SymptomChecker() {
             </Pressable>
             <View>
               <Text style={styles.headerTitle}>{t("symptom_checker_title")}</Text>
-              <Text style={styles.headerSubtitle}>{t("symptom_checker_subtitle")}</Text>
+              {/* <Text style={styles.headerSubtitle}>{t("symptom_checker_subtitle")}</Text> */}
             </View>
           </View>
         </SafeAreaView>

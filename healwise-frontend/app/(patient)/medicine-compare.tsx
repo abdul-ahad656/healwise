@@ -164,7 +164,7 @@ export default function MedicineComparison() {
             </Pressable>
             <View>
               <Text style={styles.headerTitle}>{t("medicine_compare_title")}</Text>
-              <Text style={styles.headerSubtitle}>{t("medicine_compare_subtitle")}</Text>
+              {/* <Text style={styles.headerSubtitle}>{t("medicine_compare_subtitle")}</Text> */}
             </View>
           </View>
         </SafeAreaView>

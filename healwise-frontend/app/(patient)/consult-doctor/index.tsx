@@ -69,7 +69,7 @@ export default function DoctorConsultation() {
             </Pressable>
             <View>
               <Text style={styles.headerTitle}>{t("doctor_consult_title")}</Text>
-              <Text style={styles.headerSubtitle}>{t("doctor_consult_subtitle")}</Text>
+              {/* <Text style={styles.headerSubtitle}>{t("doctor_consult_subtitle")}</Text> */}
             </View>
           </View>
         </SafeAreaView>

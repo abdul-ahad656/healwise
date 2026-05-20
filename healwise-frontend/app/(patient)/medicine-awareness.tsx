@@ -244,7 +244,7 @@ export default function MedicineSafety() {
             </Pressable>
             <View style={styles.headerTextContainer}>
               <Text style={styles.headerTitle}>{t('medicine_awareness_title')}</Text>
-              <Text style={styles.headerSubtitle}>{t('medicine_awareness_subtitle')}</Text>
+              {/* <Text style={styles.headerSubtitle}>{t('medicine_awareness_subtitle')}</Text> */}
             </View>
           </View>
         </SafeAreaView>

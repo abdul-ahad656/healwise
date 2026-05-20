@@ -83,7 +83,7 @@ export default function HomeDashboard() {
           <View style={styles.headerContent}>
             <View>
               <Text style={styles.headerTitle}>{t('home_welcome')}</Text>
-              <Text style={styles.headerSubtitle}>{t('home_welcome_urdu')}</Text>
+              {/* <Text style={styles.headerSubtitle}>{t('home_welcome_urdu')}</Text> */}
             </View>
           </View>
         </SafeAreaView>
@@ -110,7 +110,7 @@ export default function HomeDashboard() {
                   </View>
                   <View style={styles.textContainer}>
                     <Text style={styles.featureTitle}>{t(feature.titleKey)}</Text>
-                    <Text style={styles.featureSubtitle}>{t(feature.subtitleKey)}</Text>
+                    {/* <Text style={styles.featureSubtitle}>{t(feature.subtitleKey)}</Text> */}
                     <Text style={styles.featureDesc}>{t(feature.descKey)}</Text>
                   </View>
                   <ChevronRight size={20} color="#d1d5db" />
