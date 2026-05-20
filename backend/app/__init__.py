@@ -72,6 +72,7 @@ from .routes.doctor_profile_routes import doctor_profile_bp
 from .routes.health_tips_routes import health_tips_bp
 from .routes.medicine_type_routes import medicine_type_bp
 from .routes.prescription_routes import prescription_bp
+from .routes.predict_routes import predict_bp
 
 from .config import Config
 
@@ -79,7 +80,7 @@ from .config import Config
 def create_app():
     app = Flask(__name__, instance_relative_config=False)
 
-    # ✅ SAFE CONFIG (NO LOGIC)
+    Config.validate_required()
     app.config.from_object(Config)
 
     # ✅ EXTENSIONS
@@ -108,8 +109,18 @@ def create_app():
         app.register_blueprint(health_tips_bp, url_prefix="/api/health-tips")
         app.register_blueprint(medicine_type_bp, url_prefix="/api/medicine-awareness")
         app.register_blueprint(prescription_bp, url_prefix="/api/prescriptions")
+        app.register_blueprint(predict_bp)
     except Exception as e:
         print(f"⚠️  Blueprint registration warning: {e}")
+
+    # patients collection indexes (best-effort)
+    with app.app_context():
+        try:
+            from app.services.symptom_service import ensure_patients_indexes
+            if mongo.db is not None:
+                ensure_patients_indexes()
+        except Exception as e:
+            print(f"⚠️  patients index warning: {e}")
 
     # ✅ HEALTH CHECK
     @app.route("/health")

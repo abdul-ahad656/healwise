@@ -1,65 +1,122 @@
-from app.models.symptom_model import create_symptom_record, update_symptom, get_symptom_by_id
-from app.services.ai_service import predict_symptoms
-from bson.objectid import ObjectId
+import logging
+from datetime import datetime
+from typing import Any, Dict
 
-# def process_and_store_symptom(user_id: str, text: str, language: str = "en"):
-#     # 1) create initial DB record with processing state
-#     record = {
-#         "userId": user_id,
-#         "text": text,
-#         "language": language,
-#         "aiStatus": "processing",
-#         "aiAnalysis": None,
-#         "source": "user"  # can be "user" or "audio" etc.
-#     }
-#     res = create_symptom_record(record)
-#     symptom_id = str(res.inserted_id)
+from flask import current_app
+from pymongo.errors import PyMongoError
 
-#     # 2) run AI (synchronously here). For heavy loads, run this in background worker (Celery / RQ).
-#     try:
-#         ai_result = predict_symptoms(text, top_k=5)
-#         update_symptom(symptom_id, {"aiStatus": "done", "aiAnalysis": ai_result})
-#     except Exception as e:
-#         update_symptom(symptom_id, {"aiStatus": "error", "aiAnalysis": {"error": str(e)}})
+from app.extensions import mongo
+from app.models.symptom_model import create_symptom_record
+from app.services.hf_service import HFServiceError, predict_disease
 
-#     return symptom_id
+logger = logging.getLogger(__name__)
 
-# def fetch_symptom(symptom_id: str):
-#     doc = get_symptom_by_id(symptom_id)
-#     if doc is None:
-#         return None
-#     # convert ObjectId fields to strings
-#     doc["_id"] = str(doc["_id"])
-#     return doc
+
+class SymptomServiceError(Exception):
+    """Raised when symptom operations fail."""
+
+
+def get_patients_collection():
+    """Return the patients collection, verifying DB connectivity."""
+    if mongo.db is None:
+        raise SymptomServiceError("MongoDB is not initialized")
+
+    try:
+        return mongo.db.patients
+    except Exception as exc:
+        raise SymptomServiceError(f"MongoDB connection error: {exc}") from exc
+
+
+def save_patient_prediction(
+    client_id: str,
+    symptoms: str,
+    disease: str,
+    confidence: float,
+) -> str:
+    """Store one prediction document in the `patients` collection."""
+    client_id = (client_id or "").strip()
+    symptoms = (symptoms or "").strip()
+    disease = (disease or "").strip()
+
+    if not client_id:
+        raise SymptomServiceError("client_id is required for storage")
+    if not symptoms:
+        raise SymptomServiceError("symptoms are required for storage")
+    if not disease:
+        raise SymptomServiceError("disease is required for storage")
+
+    document: Dict[str, Any] = {
+        "client_id": client_id,
+        "symptoms": symptoms,
+        "disease": disease,
+        "confidence": float(confidence),
+        "timestamp": datetime.utcnow(),
+    }
+
+    try:
+        collection = get_patients_collection()
+        result = collection.insert_one(document)
+        logger.info(
+            "Saved prediction for client_id=%s disease=%s", client_id, disease
+        )
+        return str(result.inserted_id)
+    except PyMongoError as exc:
+        logger.exception("MongoDB insert failed for patients collection")
+        raise SymptomServiceError(f"Failed to save prediction: {exc}") from exc
+
+
+def ensure_patients_indexes() -> None:
+    """Create indexes for faster lookups by client_id (idempotent)."""
+    try:
+        collection = get_patients_collection()
+        collection.create_index("client_id")
+        collection.create_index([("timestamp", -1)])
+    except Exception as exc:
+        logger.warning("Could not create patients indexes: %s", exc)
 
 
 def process_and_store_symptom(user_id: str, text: str, language: str):
     """
-    Runs AI first, then saves everything, then returns result
+    Run HF Gradio prediction, persist to `patients` and `symptoms` collections,
+    return result compatible with existing /api/symptoms/submit response.
     """
+    text = (text or "").strip()
+    if not text:
+        raise HFServiceError("Symptoms text cannot be empty")
 
-    # 1️⃣ Run AI immediately
-    ai_result = predict_symptoms(text, top_k=5)
+    prediction = predict_disease(text)
+    disease = prediction["disease"]
+    confidence = prediction["confidence"]
 
-    # Optional: pick best prediction
-    primary_prediction = ai_result[0]
+    # patients collection (required by architecture)
+    try:
+        save_patient_prediction(
+            client_id=str(user_id),
+            symptoms=text,
+            disease=disease,
+            confidence=confidence,
+        )
+    except SymptomServiceError as exc:
+        raise SymptomServiceError(
+            f"Prediction succeeded but could not be saved: {exc}"
+        ) from exc
 
-    # 2️⃣ Prepare DB record
+    ai_result = [{"label": disease, "score": confidence}]
+
     record = {
         "userId": user_id,
         "text": text,
         "language": language,
-        "aiPrediction": primary_prediction["label"],
-        "confidence": round(primary_prediction["score"], 4),
-        "allPredictions": ai_result
+        "aiPrediction": disease,
+        "confidence": round(confidence, 4),
+        "allPredictions": ai_result,
     }
 
-    # 3️⃣ Save to DB
     res = create_symptom_record(record)
 
     return {
         "symptomId": str(res.inserted_id),
-        "prediction": primary_prediction["label"],
-        "confidence": primary_prediction["score"],
-        "allPredictions": ai_result
+        "prediction": disease,
+        "confidence": confidence,
+        "allPredictions": ai_result,
     }
