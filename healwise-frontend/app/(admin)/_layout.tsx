@@ -1,13 +1,32 @@
-import { Stack } from 'expo-router';
+import { Tabs } from 'expo-router';
+import { FontAwesome } from '@expo/vector-icons';
 
 export default function AdminLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="dashboard" />
-      <Stack.Screen name="manage-doctors" />
-      <Stack.Screen name="manage-health-tips" />
-      <Stack.Screen name="manage-medicine" />
-      <Stack.Screen name="analytics" />
-    </Stack>
+    <Tabs screenOptions={{ headerShown: false }}>
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => (
+            <FontAwesome name="home" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, size }) => (
+            <FontAwesome name="user" color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen name="manage-doctors" options={{ href: null }} />
+      <Tabs.Screen name="manage-health-tips" options={{ href: null }} />
+      <Tabs.Screen name="manage-medicine" options={{ href: null }} />
+      <Tabs.Screen name="analytics" options={{ href: null }} />
+    </Tabs>
   );
 }

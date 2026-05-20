@@ -5,15 +5,13 @@ import {
   Text,
   ScrollView,
   Pressable,
-  SafeAreaView,
   TextInput,
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
+import { adminScreenStyles as s, PLACEHOLDER_COLOR } from '@/styles/adminScreen';
 import {
   MedicineTypePayload,
   MedicineTypeRecord,
@@ -21,6 +19,27 @@ import {
   getAllMedicineAwareness,
   deleteMedicineAwareness,
 } from '@/services/adminService';
+import {
+  AdminActionButton,
+  adminActionsRowStyle,
+  adminPrimaryButtonStyle,
+  adminPrimaryButtonTextStyle,
+} from '@/components/admin/AdminActionButton';
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={s.fieldSpacing}>
+      <Text style={s.fieldLabel}>{label}</Text>
+      {children}
+    </View>
+  );
+}
 
 export default function ManageMedicineScreen() {
   const router = useRouter();
@@ -110,188 +129,173 @@ export default function ManageMedicineScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f9fafb' }]} />
+    <View style={s.container}>
+      <View style={[StyleSheet.absoluteFill, s.pageBg]} />
 
-      <LinearGradient
-        colors={['#0f766e', '#22c55e']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView>
-          <View style={styles.headerContent}>
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [
-                styles.backButton,
-                { opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <ArrowLeft size={20} color="#ffffff" />
-            </Pressable>
-            <View>
-              <Text style={styles.headerTitle}>Medicine Awareness</Text>
-              <Text style={styles.headerSubtitle}>
-                Create or update content for a medicine type
-              </Text>
-            </View>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+      <AdminScreenHeader
+        title="Medicine Awareness"
+        subtitle="Create or update content for a medicine type"
+        onBack={() => router.back()}
+      />
 
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <Card style={styles.card}>
-          <Text style={styles.label}>Medicine Type</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. Antibiotic"
-            value={payload.medicine_type}
-            onChangeText={(text) =>
-              setPayload((p) => ({ ...p, medicine_type: text }))
-            }
-          />
+        <Card style={s.formCard}>
+          <Text style={s.formSectionTitle}>
+            {editingType ? 'Edit content' : 'New medicine type'}
+          </Text>
 
-          <Text style={styles.label}>Short Description</Text>
-          <TextInput
-            style={[styles.input, styles.multiline]}
-            placeholder="Overview for this medicine type"
-            value={payload.description}
-            onChangeText={(text) =>
-              setPayload((p) => ({ ...p, description: text }))
-            }
-            multiline
-          />
-
-          <Text style={styles.label}>Common Uses</Text>
-          <TextInput
-            style={[styles.input, styles.multiline]}
-            placeholder="Separate points with full stops"
-            value={payload.common_uses}
-            onChangeText={(text) =>
-              setPayload((p) => ({ ...p, common_uses: text }))
-            }
-            multiline
-          />
-
-          <Text style={styles.label}>How To Use</Text>
-          <TextInput
-            style={[styles.input, styles.multiline]}
-            placeholder="Usage guidance"
-            value={payload.how_to_use}
-            onChangeText={(text) =>
-              setPayload((p) => ({ ...p, how_to_use: text }))
-            }
-            multiline
-          />
-
-          <Text style={styles.label}>Precautions</Text>
-          <TextInput
-            style={[styles.input, styles.multiline]}
-            placeholder="Important precautions"
-            value={payload.precautions}
-            onChangeText={(text) =>
-              setPayload((p) => ({ ...p, precautions: text }))
-            }
-            multiline
-          />
-
-          <Text style={styles.label}>Side Effects</Text>
-          <TextInput
-            style={[styles.input, styles.multiline]}
-            placeholder="Common side effects"
-            value={payload.side_effects}
-            onChangeText={(text) =>
-              setPayload((p) => ({ ...p, side_effects: text }))
-            }
-            multiline
-          />
-
-          <Text style={styles.label}>Warnings</Text>
-          <TextInput
-            style={[styles.input, styles.multiline]}
-            placeholder="Important warnings"
-            value={payload.warnings}
-            onChangeText={(text) =>
-              setPayload((p) => ({ ...p, warnings: text }))
-            }
-            multiline
-          />
-
-          <View style={styles.row}>
-            <Pressable
-              onPress={() =>
-                setPayload((p) => ({ ...p, otc: !p.otc }))
+          <Field label="Medicine type">
+            <TextInput
+              style={s.input}
+              placeholder="e.g. antibiotic, steroid, painkiller"
+              placeholderTextColor={PLACEHOLDER_COLOR}
+              value={payload.medicine_type}
+              onChangeText={(text) =>
+                setPayload((p) => ({ ...p, medicine_type: text }))
               }
+            />
+          </Field>
+
+          <Field label="Short description">
+            <TextInput
+              style={[s.input, s.inputMultiline]}
+              placeholder="Short overview for this medicine type"
+              placeholderTextColor={PLACEHOLDER_COLOR}
+              value={payload.description}
+              onChangeText={(text) =>
+                setPayload((p) => ({ ...p, description: text }))
+              }
+              multiline
+            />
+          </Field>
+
+          <Field label="Common uses">
+            <TextInput
+              style={[s.input, s.inputMultiline]}
+              placeholder="Common uses (one point per line)"
+              placeholderTextColor={PLACEHOLDER_COLOR}
+              value={payload.common_uses}
+              onChangeText={(text) =>
+                setPayload((p) => ({ ...p, common_uses: text }))
+              }
+              multiline
+            />
+          </Field>
+
+          <Field label="How to use">
+            <TextInput
+              style={[s.input, s.inputMultiline]}
+              placeholder="How to use safely"
+              placeholderTextColor={PLACEHOLDER_COLOR}
+              value={payload.how_to_use}
+              onChangeText={(text) =>
+                setPayload((p) => ({ ...p, how_to_use: text }))
+              }
+              multiline
+            />
+          </Field>
+
+          <Field label="Precautions">
+            <TextInput
+              style={[s.input, s.inputMultiline]}
+              placeholder="Precautions and warnings"
+              placeholderTextColor={PLACEHOLDER_COLOR}
+              value={payload.precautions}
+              onChangeText={(text) =>
+                setPayload((p) => ({ ...p, precautions: text }))
+              }
+              multiline
+            />
+          </Field>
+
+          <Field label="Side effects">
+            <TextInput
+              style={[s.input, s.inputMultiline]}
+              placeholder="Possible side effects"
+              placeholderTextColor={PLACEHOLDER_COLOR}
+              value={payload.side_effects}
+              onChangeText={(text) =>
+                setPayload((p) => ({ ...p, side_effects: text }))
+              }
+              multiline
+            />
+          </Field>
+
+          <Field label="Warnings">
+            <TextInput
+              style={[s.input, s.inputMultiline]}
+              placeholder="Important warnings for patients"
+              placeholderTextColor={PLACEHOLDER_COLOR}
+              value={payload.warnings}
+              onChangeText={(text) =>
+                setPayload((p) => ({ ...p, warnings: text }))
+              }
+              multiline
+            />
+          </Field>
+
+          <View style={local.checkboxRow}>
+            <Pressable
+              onPress={() => setPayload((p) => ({ ...p, otc: !p.otc }))}
               style={({ pressed }) => [
-                styles.checkbox,
-                payload.otc && styles.checkboxChecked,
+                local.checkbox,
+                payload.otc && local.checkboxChecked,
                 { opacity: pressed ? 0.8 : 1 },
               ]}
             >
               <View
                 style={[
-                  styles.checkboxInner,
-                  payload.otc && styles.checkboxInnerChecked,
+                  local.checkboxInner,
+                  payload.otc && local.checkboxInnerChecked,
                 ]}
               />
             </Pressable>
-            <Text style={styles.checkboxLabel}>Available over the counter</Text>
+            <Text style={local.checkboxLabel}>Available over the counter</Text>
           </View>
 
-          <Button
-            title={
-              saving
+          <Pressable
+            onPress={handleSave}
+            disabled={saving}
+            style={[adminPrimaryButtonStyle, { opacity: saving ? 0.6 : 1 }]}
+          >
+            <Text style={adminPrimaryButtonTextStyle}>
+              {saving
                 ? 'Saving...'
                 : editingType
                 ? 'Update Content'
-                : 'Save Content'
-            }
-            onPress={handleSave}
-            disabled={saving}
-            style={styles.saveBtn}
-          />
+                : 'Save Content'}
+            </Text>
+          </Pressable>
         </Card>
 
-        <Text style={styles.sectionTitle}>Existing Medicine Awareness</Text>
+        <Text style={s.listSectionTitle}>Existing Medicine Awareness</Text>
         {loading ? (
-          <Text style={styles.infoText}>Loading medicine awareness...</Text>
+          <Text style={s.infoText}>Loading medicine awareness...</Text>
         ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={s.errorText}>{error}</Text>
         ) : items.length === 0 ? (
-          <Text style={styles.infoText}>No medicine awareness found.</Text>
+          <Text style={s.infoText}>No medicine awareness found.</Text>
         ) : (
           items.map((item) => (
-            <Card key={item._id} style={styles.itemCard}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemTitle}>{item.medicine_type}</Text>
-                <Text style={styles.itemMeta} numberOfLines={2}>
-                  {item.description}
-                </Text>
-              </View>
-              <View style={styles.actionsRow}>
-                <Pressable
+            <Card key={item._id} style={s.listCard}>
+              <Text style={s.listCardTitle}>{item.medicine_type}</Text>
+              <Text style={s.listCardMeta} numberOfLines={3}>
+                {item.description}
+              </Text>
+              <View style={adminActionsRowStyle}>
+                <AdminActionButton
+                  variant="edit"
                   onPress={() => handleEdit(item)}
-                  style={({ pressed }) => [
-                    styles.editBtn,
-                    { opacity: pressed ? 0.85 : 1 },
-                  ]}
-                >
-                  <Text style={styles.editText}>Edit</Text>
-                </Pressable>
-                <Pressable
+                />
+                <AdminActionButton
+                  variant="delete"
                   onPress={() => handleDelete(item.medicine_type)}
-                  style={({ pressed }) => [
-                    styles.deleteBtn,
-                    { opacity: pressed ? 0.85 : 1 },
-                  ]}
-                >
-                  <Text style={styles.deleteText}>Delete</Text>
-                </Pressable>
+                />
               </View>
             </Card>
           ))
@@ -301,86 +305,20 @@ export default function ManageMedicineScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  headerContent: {
-    marginTop: 20,
+const local = StyleSheet.create({
+  checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#ffffff',
-    opacity: 0.9,
-  },
-  scroll: { flex: 1, marginTop: -16 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 32 },
-  card: {
-    padding: 16,
-    borderRadius: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#111827',
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 13,
-    backgroundColor: '#ffffff',
-  },
-  multiline: {
-    minHeight: 60,
-    textAlignVertical: 'top',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 12,
+    marginBottom: 20,
+    marginTop: 4,
   },
   checkbox: {
-    width: 20,
-    height: 20,
+    width: 24,
+    height: 24,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderWidth: 2,
+    borderColor: '#9ca3af',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#ffffff',
@@ -389,8 +327,8 @@ const styles = StyleSheet.create({
     borderColor: '#16a34a',
   },
   checkboxInner: {
-    width: 10,
-    height: 10,
+    width: 12,
+    height: 12,
     borderRadius: 3,
     backgroundColor: 'transparent',
   },
@@ -398,64 +336,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#16a34a',
   },
   checkboxLabel: {
-    fontSize: 13,
-    color: '#111827',
-  },
-  saveBtn: {
-    marginTop: 16,
-    borderRadius: 999,
-    backgroundColor: '#0f766e',
-  },
-  infoText: {
-    fontSize: 13,
-    color: '#6b7280',
-  },
-  errorText: {
-    fontSize: 13,
-    color: '#b91c1c',
-  },
-  itemCard: {
-    marginTop: 8,
-    padding: 14,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  itemTitle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#111827',
-  },
-  itemMeta: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 2,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  editBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#3b82f6',
-  },
-  editText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  deleteBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#ef4444',
-  },
-  deleteText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
+    flex: 1,
   },
 });

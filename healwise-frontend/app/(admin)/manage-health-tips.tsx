@@ -1,18 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import {
-  StyleSheet,
   View,
   Text,
   ScrollView,
   Pressable,
-  SafeAreaView,
   TextInput,
   Alert,
+  StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
+import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
+import { AdminSelect } from '@/components/admin/AdminSelect';
 import {
   getAdminHealthTips,
   createHealthTip,
@@ -21,6 +20,27 @@ import {
   deleteHealthTip,
   AdminHealthTip,
 } from '@/services/adminService';
+import {
+  AdminActionButton,
+  adminActionsRowStyle,
+  adminPrimaryButtonStyle,
+  adminPrimaryButtonTextStyle,
+} from '@/components/admin/AdminActionButton';
+import { adminScreenStyles as s, PLACEHOLDER_COLOR } from '@/styles/adminScreen';
+
+const TIP_TYPE_OPTIONS = [
+  {
+    value: 'general' as const,
+    label: 'General',
+    description: 'Health tips for all patients',
+  },
+  {
+    value: 'disease' as const,
+    label: 'Disease-specific',
+    description: 'Tips tied to a specific disease or condition',
+  },
+];
+
 
 export default function ManageHealthTipsScreen() {
   const router = useRouter();
@@ -33,7 +53,7 @@ export default function ManageHealthTipsScreen() {
     description: '',
     type: 'general' as 'general' | 'disease',
     disease: '',
-    language: 'en',
+    language: 'en' as 'en' | 'ur',
   });
   const [editingTipId, setEditingTipId] = useState<string | null>(null);
 
@@ -55,6 +75,10 @@ export default function ManageHealthTipsScreen() {
   const handleSave = async () => {
     if (!form.title || !form.description) {
       Alert.alert('Validation', 'Title and description are required');
+      return;
+    }
+    if (form.type === 'disease' && !form.disease.trim()) {
+      Alert.alert('Validation', 'Enter a disease name for disease-specific tips');
       return;
     }
 
@@ -112,7 +136,7 @@ export default function ManageHealthTipsScreen() {
       description: tip.description,
       type: tip.type,
       disease: tip.disease || '',
-      language: tip.language,
+      language: (tip.language === 'ur' ? 'ur' : 'en') as 'en' | 'ur',
     });
     setEditingTipId(tip._id);
   };
@@ -137,123 +161,87 @@ export default function ManageHealthTipsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f9fafb' }]} />
+    <View style={s.container}>
+      <View style={[StyleSheet.absoluteFill, s.pageBg]} />
 
-      <LinearGradient
-        colors={['#0f766e', '#22c55e']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView>
-          <View style={styles.headerContent}>
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [
-                styles.backButton,
-                { opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <ArrowLeft size={20} color="#ffffff" />
-            </Pressable>
-            <View>
-              <Text style={styles.headerTitle}>Manage Health Tips</Text>
-              <Text style={styles.headerSubtitle}>
-                Publish and deactivate health tips
-              </Text>
-            </View>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+      <AdminScreenHeader
+        title="Manage Health Tips"
+        subtitle="Publish and deactivate health tips"
+        onBack={() => router.back()}
+      />
 
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <Card style={styles.formCard}>
-          <Text style={styles.sectionTitle}>Create Health Tip</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Title"
-            value={form.title}
-            onChangeText={(text) => setForm((f) => ({ ...f, title: text }))}
-          />
-          <TextInput
-            style={[styles.input, styles.multiline]}
-            placeholder="Description"
-            value={form.description}
-            onChangeText={(text) =>
-              setForm((f) => ({ ...f, description: text }))
-            }
-            multiline
-          />
-          <View style={styles.row}>
-            <Pressable
-              onPress={() =>
-                setForm((f) => ({ ...f, type: 'general', disease: '' }))
-              }
-              style={({ pressed }) => [
-                styles.chip,
-                form.type === 'general' && styles.chipActive,
-                { opacity: pressed ? 0.8 : 1 },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  form.type === 'general' && styles.chipTextActive,
-                ]}
-              >
-                General
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setForm((f) => ({ ...f, type: 'disease' }))}
-              style={({ pressed }) => [
-                styles.chip,
-                form.type === 'disease' && styles.chipActive,
-                { opacity: pressed ? 0.8 : 1 },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  form.type === 'disease' && styles.chipTextActive,
-                ]}
-              >
-                Disease-specific
-              </Text>
-            </Pressable>
-          </View>
-          {form.type === 'disease' && (
+        <Card style={s.formCard}>
+          <Text style={s.formSectionTitle}>
+            {editingTipId ? 'Edit Health Tip' : 'Create Health Tip'}
+          </Text>
+
+          <View style={s.fieldSpacing}>
+            <Text style={s.fieldLabel}>Title</Text>
             <TextInput
-              style={styles.input}
-              placeholder="Disease name"
-              value={form.disease}
-              onChangeText={(text) =>
-                setForm((f) => ({ ...f, disease: text }))
-              }
+              style={s.input}
+              placeholder="Tip title"
+              placeholderTextColor={PLACEHOLDER_COLOR}
+              value={form.title}
+              onChangeText={(text) => setForm((f) => ({ ...f, title: text }))}
             />
-          )}
-          <TextInput
-            style={styles.input}
-            placeholder="Language (en/ur)"
-            value={form.language}
-            onChangeText={(text) =>
-              setForm((f) => ({ ...f, language: text }))
+          </View>
+
+          <View style={s.fieldSpacing}>
+            <Text style={s.fieldLabel}>Description</Text>
+            <TextInput
+              style={[s.input, s.inputMultiline]}
+              placeholder="Full description for patients"
+              placeholderTextColor={PLACEHOLDER_COLOR}
+              value={form.description}
+              onChangeText={(text) =>
+                setForm((f) => ({ ...f, description: text }))
+              }
+              multiline
+            />
+          </View>
+
+          <AdminSelect
+            label="Tip type"
+            value={form.type}
+            options={TIP_TYPE_OPTIONS}
+            placeholder="Choose General or Disease-specific"
+            onChange={(type) =>
+              setForm((f) => ({
+                ...f,
+                type,
+                disease: type === 'general' ? '' : f.disease,
+              }))
             }
           />
+
+          {form.type === 'disease' ? (
+            <View style={s.fieldSpacing}>
+              <Text style={s.fieldLabel}>Disease name</Text>
+              <TextInput
+                style={s.input}
+                placeholder="e.g. Diabetes, Hypertension"
+                placeholderTextColor={PLACEHOLDER_COLOR}
+                value={form.disease}
+                onChangeText={(text) =>
+                  setForm((f) => ({ ...f, disease: text }))
+                }
+              />
+            </View>
+          ) : null}
+
+
           <Pressable
             onPress={handleSave}
             disabled={saving}
-            style={({ pressed }) => [
-              styles.primaryBtn,
-              { opacity: saving ? 0.6 : pressed ? 0.85 : 1 },
-            ]}
+            style={[adminPrimaryButtonStyle, { opacity: saving ? 0.6 : 1 }]}
           >
-            <Text style={styles.primaryBtnText}>
+            <Text style={adminPrimaryButtonTextStyle}>
               {saving
                 ? 'Saving...'
                 : editingTipId
@@ -263,58 +251,46 @@ export default function ManageHealthTipsScreen() {
           </Pressable>
         </Card>
 
-        <Text style={styles.sectionTitle}>Existing Tips</Text>
+        <Text style={s.listSectionTitle}>Existing Tips</Text>
         {loading ? (
-          <Text style={styles.infoText}>Loading tips...</Text>
+          <Text style={s.infoText}>Loading tips...</Text>
         ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={s.errorText}>{error}</Text>
         ) : tips.length === 0 ? (
-          <Text style={styles.infoText}>No tips found.</Text>
+          <Text style={s.infoText}>No tips found.</Text>
         ) : (
           tips.map((tip) => (
-            <Card key={tip._id} style={styles.tipCard}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.tipTitle}>{tip.title}</Text>
-                <Text style={styles.tipMeta}>
-                  Type:{' '}
-                  {tip.type === 'general'
-                    ? 'General'
-                    : `Disease – ${tip.disease || 'N/A'}`}
-                </Text>
-                <Text style={styles.tipMeta}>
-                  Status: {tip.active ? 'Active' : 'Inactive'}
-                </Text>
-              </View>
-              <View style={styles.tipActions}>
-                <Pressable
+            <Card key={tip._id} style={s.listCard}>
+              <Text style={s.listCardTitle}>{tip.title}</Text>
+              <Text style={s.listCardMeta}>
+                Type:{' '}
+                {tip.type === 'general'
+                  ? 'General'
+                  : `Disease – ${tip.disease || 'N/A'}`}
+              </Text>
+              <Text style={s.listCardMeta}>
+                Language: {tip.language === 'ur' ? 'Urdu' : 'English'}
+              </Text>
+              <Text style={s.listCardMeta}>
+                Status: {tip.active ? 'Active' : 'Inactive'}
+              </Text>
+              <View style={adminActionsRowStyle}>
+                <AdminActionButton
+                  variant="edit"
                   onPress={() => handleEditTip(tip)}
-                  style={({ pressed }) => [
-                    styles.editBtn,
-                    { opacity: pressed ? 0.85 : 1 },
-                  ]}
-                >
-                  <Text style={styles.editText}>Edit</Text>
-                </Pressable>
-                {tip.active && (
-                  <Pressable
+                />
+                {tip.active ? (
+                  <AdminActionButton
+                    variant="deactivate"
                     onPress={() => handleDeactivate(tip._id)}
-                    style={({ pressed }) => [
-                      styles.deactivateBtn,
-                      { opacity: pressed ? 0.85 : 1 },
-                    ]}
-                  >
-                    <Text style={styles.deactivateText}>Deactivate</Text>
-                  </Pressable>
+                  />
+                ) : (
+                  <AdminActionButton variant="inactive" />
                 )}
-                <Pressable
+                <AdminActionButton
+                  variant="delete"
                   onPress={() => handleDeleteTip(tip._id)}
-                  style={({ pressed }) => [
-                    styles.deleteBtn,
-                    { opacity: pressed ? 0.85 : 1 },
-                  ]}
-                >
-                  <Text style={styles.deleteText}>Delete</Text>
-                </Pressable>
+                />
               </View>
             </Card>
           ))
@@ -323,169 +299,3 @@ export default function ManageHealthTipsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  headerContent: {
-    marginTop: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#ffffff',
-    opacity: 0.9,
-  },
-  scroll: { flex: 1, marginTop: -16 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 32 },
-  formCard: {
-    padding: 16,
-    borderRadius: 20,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 13,
-    backgroundColor: '#ffffff',
-    marginTop: 6,
-  },
-  multiline: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    backgroundColor: '#ffffff',
-  },
-  chipActive: {
-    backgroundColor: '#0f766e',
-    borderColor: '#0f766e',
-  },
-  chipText: {
-    fontSize: 12,
-    color: '#111827',
-    fontWeight: '500',
-  },
-  chipTextActive: {
-    color: '#ffffff',
-  },
-  primaryBtn: {
-    marginTop: 10,
-    backgroundColor: '#0f766e',
-    paddingVertical: 10,
-    borderRadius: 999,
-    alignItems: 'center',
-  },
-  primaryBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  infoText: {
-    fontSize: 13,
-    color: '#6b7280',
-  },
-  errorText: {
-    fontSize: 13,
-    color: '#b91c1c',
-  },
-  tipCard: {
-    marginTop: 8,
-    padding: 14,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  tipTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  tipMeta: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 2,
-  },
-  tipActions: {
-    alignItems: 'flex-end',
-    gap: 6,
-  },
-  editBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#3b82f6',
-  },
-  editText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  deactivateBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#ef4444',
-  },
-  deactivateText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  deleteBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#b91c1c',
-  },
-  deleteText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-});

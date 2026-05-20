@@ -42,7 +42,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
-    width: "100%",          // <-- Add this
+    width: "100%",
+    overflow: "visible",
   },
   header: { marginBottom: 12 },
   title: { fontSize: 18, fontWeight: "600", color: "#111827" },
