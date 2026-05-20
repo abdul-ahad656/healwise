@@ -125,7 +125,7 @@ jobs:
             --concurrency 80 \
             --max-instances 10 \
             --timeout 300 \
-            --set-env-vars FLASK_ENV=production \
+            --set-env-vars FLASK_ENV=production,HF_SPACE_URL=https://adibutt-symptom-classifier.hf.space,HF_API_NAME=/predict,HF_PREDICT_TIMEOUT=90 \
             --set-secrets MONGO_URI=MONGO_URI:latest \
             --set-secrets JWT_SECRET_KEY=JWT_SECRET_KEY:latest \
             --set-secrets SECRET_KEY=SECRET_KEY:latest \
