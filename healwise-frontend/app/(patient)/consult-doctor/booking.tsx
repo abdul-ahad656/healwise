@@ -5,17 +5,16 @@ import {
   Text,
   Pressable,
   ScrollView,
-  SafeAreaView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Clock } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Clock } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
+import { PatientPrimaryButton } from '@/components/patient/PatientPrimaryButton';
+import { patientScreenStyles as s } from '@/styles/patientScreen';
 import {
   getDoctorAvailability,
   DoctorAvailabilityDay,
-  bookAppointment,
 } from '@/services/doctorService';
 
 const formatDayLabel = (day: string) => {
@@ -38,8 +37,6 @@ export default function DoctorBooking() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [booking, setBooking] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!doctorId) {
@@ -70,137 +67,113 @@ export default function DoctorBooking() {
     [availability, selectedDay]
   );
 
-  const handleBook = async () => {
+  const handleBook = () => {
     if (!doctorId || !selectedDay || !selectedSlot) {
       setError('Please select a day and time slot');
       return;
     }
 
     setError(null);
-    setSuccessMessage(null);
-    setBooking(true);
-    try {
-      await bookAppointment(
-        doctorId as string,
-        selectedDay,
-        selectedSlot,
-        symptomId as string | undefined
-      );
-      setSuccessMessage('Appointment booked successfully');
-      setTimeout(() => {
-        router.back();
-      }, 800);
-    } catch (err: any) {
-      setError(err.message || 'Failed to book appointment');
-    } finally {
-      setBooking(false);
-    }
+    router.push({
+      pathname: '/(patient)/payment',
+      params: {
+        doctorId,
+        doctorName,
+        appointmentDate: selectedDay,
+        appointmentTime: selectedSlot,
+        symptomId,
+      },
+    });
   };
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
+    <View style={s.container}>
+      <View style={[StyleSheet.absoluteFill, s.pageBg]} />
+
+      <PatientScreenHeader
+        title="Select slot"
+        subtitle={doctorName || 'Doctor'}
+        onBack={() => router.back()}
         colors={['#a855f7', '#ec4899']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView>
-          <View style={styles.headerContent}>
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-            >
-              <ArrowLeft size={24} color="white" />
-            </Pressable>
-            <View>
-              <Text style={styles.headerTitle}>Select Slot</Text>
-              <Text style={styles.headerSubtitle}>
-                {doctorName || 'Doctor'}
-              </Text>
-            </View>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+      />
 
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {loading ? (
-          <Text style={styles.infoText}>Loading availability...</Text>
-        ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={s.infoText}>Loading availability...</Text>
+        ) : error && !selectedDayData ? (
+          <Text style={s.errorText}>{error}</Text>
         ) : availability.length === 0 ? (
-          <Text style={styles.infoText}>No availability set for this doctor.</Text>
+          <Text style={s.infoText}>No availability set for this doctor.</Text>
         ) : (
           <>
-            <Text style={styles.sectionTitle}>Available Days</Text>
-            <View style={styles.daysRow}>
-              {availability.map((day) => (
-                <Pressable
-                  key={day._id}
-                  onPress={() => setSelectedDay(day.day)}
-                  style={[
-                    styles.dayChip,
-                    selectedDay === day.day && styles.dayChipActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dayChipText,
-                      selectedDay === day.day && styles.dayChipTextActive,
-                    ]}
+            <Text style={s.sectionTitle}>Available days</Text>
+            <View style={local.chipsRow}>
+              {availability.map((day) => {
+                const active = selectedDay === day.day;
+                return (
+                  <Pressable
+                    key={day._id}
+                    onPress={() => {
+                      setSelectedDay(day.day);
+                      setSelectedSlot(null);
+                    }}
+                    style={[local.chip, active && local.chipActive]}
                   >
-                    {formatDayLabel(day.day)}
-                  </Text>
-                </Pressable>
-              ))}
+                    <Text style={[local.chipText, active && local.chipTextActive]}>
+                      {formatDayLabel(day.day)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
-            <Text style={styles.sectionTitle}>Available Slots</Text>
+            <Text style={[s.sectionTitle, { marginTop: 20 }]}>Available slots</Text>
             {selectedDayData && selectedDayData.slots.length > 0 ? (
-              <Card style={styles.slotsCard}>
-                <View style={styles.slotsHeader}>
-                  <Clock size={14} color="#4b5563" />
-                  <Text style={styles.slotsHeaderText}>
+              <Card style={local.slotsCard}>
+                <View style={local.slotsHeader}>
+                  <Clock size={16} color="#6b21a8" />
+                  <Text style={local.slotsHeaderText}>
                     {formatDayLabel(selectedDayData.day)}
                   </Text>
                 </View>
-                <View style={styles.slotsGrid}>
-                  {selectedDayData.slots.map((slot) => (
-                    <Pressable
-                      key={slot}
-                      onPress={() => setSelectedSlot(slot)}
-                      style={[
-                        styles.slotChip,
-                        selectedSlot === slot && styles.slotChipActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.slotChipText,
-                          selectedSlot === slot && styles.slotChipTextActive,
-                        ]}
+                <View style={local.slotsGrid}>
+                  {selectedDayData.slots.map((slot) => {
+                    const active = selectedSlot === slot;
+                    return (
+                      <Pressable
+                        key={slot}
+                        onPress={() => setSelectedSlot(slot)}
+                        style={[local.slotChip, active && local.slotChipActive]}
                       >
-                        {slot}
-                      </Text>
-                    </Pressable>
-                  ))}
+                        <Text
+                          style={[
+                            local.slotChipText,
+                            active && local.slotChipTextActive,
+                          ]}
+                        >
+                          {slot}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
-                <Button
-                  title={booking ? 'Booking...' : 'Book Appointment'}
+
+                {error ? <Text style={s.errorText}>{error}</Text> : null}
+
+                <PatientPrimaryButton
+                  label="Continue to payment"
+                  variant="accent"
                   onPress={handleBook}
-                  disabled={!selectedSlot || booking}
-                  style={styles.bookButton}
+                  disabled={!selectedSlot}
+                  style={{ marginTop: 16 }}
                 />
-                {successMessage && (
-                  <Text style={styles.successText}>{successMessage}</Text>
-                )}
               </Card>
             ) : (
-              <Text style={styles.infoText}>
+              <Text style={s.infoText}>
                 No time slots available for the selected day.
               </Text>
             )}
@@ -211,75 +184,70 @@ export default function DoctorBooking() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  headerContent: {
+const local = StyleSheet.create({
+  chipsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 10,
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: 'white' },
-  headerSubtitle: { fontSize: 14, color: 'white', opacity: 0.8 },
-  scrollView: { flex: 1, marginTop: -20 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  infoText: { fontSize: 13, color: '#6b7280', marginTop: 12 },
-  errorText: { fontSize: 13, color: '#b91c1c', marginTop: 12 },
-  daysRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  dayChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 999,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#d1d5db',
     backgroundColor: '#ffffff',
   },
-  dayChipActive: {
-    backgroundColor: '#a855f7',
-    borderColor: '#a855f7',
+  chipActive: {
+    backgroundColor: '#f3e8ff',
+    borderColor: '#9333ea',
   },
-  dayChipText: { fontSize: 12, color: '#374151' },
-  dayChipTextActive: { color: '#ffffff', fontWeight: '600' },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  chipTextActive: {
+    color: '#6b21a8',
+  },
   slotsCard: {
-    marginTop: 8,
-    padding: 16,
+    padding: 18,
     borderRadius: 16,
   },
-  slotsHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  slotsHeaderText: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  slotsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  slotsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  slotsHeaderText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  slotsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
   slotChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#eef2ff',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#ede9fe',
+    borderWidth: 2,
+    borderColor: '#c4b5fd',
   },
   slotChipActive: {
-    backgroundColor: '#a855f7',
+    backgroundColor: '#9333ea',
+    borderColor: '#6b21a8',
   },
-  slotChipText: { fontSize: 12, color: '#3730a3', fontWeight: '600' },
-  slotChipTextActive: { color: '#ffffff' },
-  bookButton: {
-    marginTop: 16,
-    borderRadius: 999,
-  },
-  successText: {
-    marginTop: 8,
+  slotChipText: {
     fontSize: 13,
-    color: '#15803d',
+    fontWeight: '800',
+    color: '#5b21b6',
+  },
+  slotChipTextActive: {
+    color: '#ffffff',
   },
 });
-

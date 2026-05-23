@@ -33,6 +33,16 @@ class Config:
     MAX_PRESCRIPTION_FILE_SIZE = 10 * 1024 * 1024
     ALLOWED_PRESCRIPTION_EXTENSIONS = {"pdf", "jpg", "jpeg", "png"}
 
+    # Stripe Payment
+    STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+    STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
+    STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+    APPOINTMENT_CONSULTATION_FEE = int(os.getenv("APPOINTMENT_CONSULTATION_FEE", "5000"))  # in cents
+
+    # Easypaisa Payment
+    EASYPAISA_RECEIVER_NUMBER = "03144828190"
+    SUPPORTED_PAYMENT_METHODS = ["stripe", "easypaisa"]
+
     JSON_SORT_KEYS = False
     PROPAGATE_EXCEPTIONS = True
 

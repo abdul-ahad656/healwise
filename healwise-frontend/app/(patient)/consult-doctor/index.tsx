@@ -5,23 +5,14 @@ import {
   Text,
   Pressable,
   ScrollView,
-  SafeAreaView,
-  Image,
   Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { 
-  ArrowLeft, 
-  Video, 
-  MessageCircle, 
-  Star, 
-  Clock, 
-  Phone,
-  Info,
-} from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Star, Clock, Phone, Info } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
+import { PatientPrimaryButton } from '@/components/patient/PatientPrimaryButton';
+import { patientScreenStyles as ps } from '@/styles/patientScreen';
 import { getPublicDoctors, Doctor } from '@/services/doctorService';
 import { useTranslation } from 'react-i18next';
 
@@ -51,33 +42,30 @@ export default function DoctorConsultation() {
     fetchDoctors();
   }, []);
 
+  const goToBooking = (doctor: Doctor) => {
+    router.push({
+      pathname: '/(patient)/consult-doctor/booking',
+      params: {
+        doctorId: doctor.id,
+        doctorName: doctor.name,
+        symptomId,
+      },
+    });
+  };
+
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={["#a855f7", "#ec4899"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView>
-          <View style={styles.headerContent}>
-            <Pressable 
-              onPress={() => router.back()} 
-              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-            >
-              <ArrowLeft size={24} color="white" />
-            </Pressable>
-            <View>
-              <Text style={styles.headerTitle}>{t("doctor_consult_title")}</Text>
-              {/* <Text style={styles.headerSubtitle}>{t("doctor_consult_subtitle")}</Text> */}
-            </View>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+      <View style={[StyleSheet.absoluteFill, ps.pageBg]} />
 
-      <ScrollView 
-        style={styles.scrollView} 
-        contentContainerStyle={styles.scrollContent}
+      <PatientScreenHeader
+        title={t('doctor_consult_title')}
+        onBack={() => router.back()}
+        colors={['#a855f7', '#ec4899']}
+      />
+
+      <ScrollView
+        style={ps.scroll}
+        contentContainerStyle={ps.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.statsGrid}>
@@ -104,21 +92,7 @@ export default function DoctorConsultation() {
           ) : doctors.length === 0 ? (
             <Text style={styles.emptyText}>{t("doctor_empty")}</Text>
           ) : doctors.map((doctor) => (
-            <Pressable
-              key={doctor.id}
-              onPress={() =>
-                router.push({
-                  pathname: '/(patient)/consult-doctor/booking',
-                  params: {
-                    doctorId: doctor.id,
-                    doctorName: doctor.name,
-                    symptomId,
-                  },
-                })
-              }
-              style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
-            >
-              <Card style={styles.doctorCard}>
+            <Card key={doctor.id} style={[styles.doctorCard, { marginBottom: 16 }]}>
                 <View style={styles.doctorInfoRow}>
                   {/* Placeholder avatar; backend does not provide image */}
                   <View style={styles.avatar}>
@@ -165,19 +139,13 @@ export default function DoctorConsultation() {
                   </View>
                 </View>
 
-                <View style={styles.actionButtons}>
-                  <Button 
-                    title={t("doctor_view_slots")} 
-                    style={styles.videoBtn}
-                  />
-                  <Button 
-                    title={t("doctor_chat")} 
-                    variant="outline" 
-                    style={styles.chatBtn}
-                  />
-                </View>
+                <PatientPrimaryButton
+                  label={t('doctor_view_slots')}
+                  variant="accent"
+                  onPress={() => goToBooking(doctor)}
+                  style={{ marginTop: 12 }}
+                />
               </Card>
-            </Pressable>
           ))}
         </View>
 
@@ -235,10 +203,15 @@ const styles = StyleSheet.create({
   expText: { fontSize: 12, color: '#6b7280' },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   statusText: { fontSize: 10, fontWeight: '600' },
-  actionButtons: { flexDirection: 'row', gap: 10 },
-  videoBtn: { flex: 1, backgroundColor: '#a855f7', height: 40, borderRadius: 12 },
-  chatBtn: { flex: 1, height: 40, borderRadius: 12, borderColor: '#a855f7' },
-  emergencyCard: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#fef2f2', borderColor: '#fecaca', gap: 12 },
+  emergencyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+    gap: 12,
+    marginTop: 8,
+  },
   emergencyIcon: { width: 40, height: 40, backgroundColor: '#ef4444', borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   emergencyTitle: { fontSize: 14, fontWeight: '700', color: '#991b1b' },
   emergencyText: { fontSize: 12, color: '#b91c1c' },

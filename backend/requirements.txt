@@ -4,6 +4,7 @@ flask-pymongo==2.3.0
 flask-jwt-extended==4.5.3
 python-dotenv==1.0.0
 cloudinary==1.36.0
+stripe==10.3.0
 transformers==4.36.0
 torch==2.1.1
 pandas==2.1.4
