@@ -14,22 +14,29 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, CreditCard, CheckCircle, Copy } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { PatientPrimaryButton } from '@/components/patient/PatientPrimaryButton';
 import {
   createPayment,
   submitPaymentProof,
-  formatPaymentAmount,
-  convertUsdToPkr,
-  getPaymentMethodLabel,
+  getPaymentAmountPkr,
   PaymentResponse,
   PaymentMethod,
   EasypaisaPaymentResponse,
 } from '@/services/paymentService';
 import { getPatientAppointments } from '@/services/doctorPanelService';
-import AuthStore from '@/services/authStore';
 
-// Generate unique appointment ID for payment tracking
-const generateAppointmentId = () => `appt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+function generateAppointmentId() {
+  return `appt_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+const PAYMENT_METHOD_OPTIONS: {
+  value: PaymentMethod | null;
+  label: string;
+}[] = [
+  { value: null, label: 'None' },
+  { value: 'stripe', label: 'Credit/Debit Card (Instant)' },
+  { value: 'easypaisa', label: 'Easypaisa Transfer (Manual)' },
+];
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -42,14 +49,19 @@ export default function PaymentScreen() {
       symptomId?: string;
     }>();
 
-  const [appointmentId] = useState(generateAppointmentId());
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
+  const [appointmentId] = useState(() => {
+    const id = generateAppointmentId();
+    console.log('Generated appointmentId:', id);
+    return id;
+  });
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentResponse, setPaymentResponse] = useState<PaymentResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [methodLoading, setMethodLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [proofSubmitted, setProofSubmitted] = useState(false);
+  const [showPaymentMethodDropdown, setShowPaymentMethodDropdown] = useState(false);
   const [cardDetails, setCardDetails] = useState({
     number: '',
     expiry: '',
@@ -63,35 +75,30 @@ export default function PaymentScreen() {
   useEffect(() => {
     if (!doctorId || !appointmentDate || !appointmentTime) {
       setError('Missing appointment details');
-      setLoading(false);
-      return;
     }
-    initializePayment();
-  }, []);
+  }, [doctorId, appointmentDate, appointmentTime]);
 
-  const initializePayment = async () => {
-    try {
-      setError(null);
-      const response = await createPayment(
-        appointmentId,
-        appointmentDate as string,
-        appointmentTime as string,
-        doctorId as string,
-        'stripe', // Default to Stripe for initial load
-        symptomId
-      );
-      setPaymentResponse(response);
-    } catch (err: any) {
-      setError(err.message || 'Failed to initialize payment');
-    } finally {
-      setLoading(false);
-    }
+  const getPaymentMethodLabel = (method: PaymentMethod | null) => {
+    if (method === null) return 'None';
+    const option = PAYMENT_METHOD_OPTIONS.find((item) => item.value === method);
+    return option?.label ?? 'None';
   };
 
-  const handlePaymentMethodChange = async (method: PaymentMethod) => {
+  const handlePaymentMethodChange = async (method: PaymentMethod | null) => {
+    setShowPaymentMethodDropdown(false);
+
     if (method === paymentMethod) return;
 
-    setLoading(true);
+    if (method === null) {
+      setPaymentMethod(null);
+      setPaymentResponse(null);
+      setError(null);
+      setCardDetails({ number: '', expiry: '', cvc: '' });
+      setEasypaisaProof({ type: 'screenshot', value: '' });
+      return;
+    }
+
+    setMethodLoading(true);
     setError(null);
 
     try {
@@ -106,10 +113,9 @@ export default function PaymentScreen() {
       setPaymentMethod(method);
       setPaymentResponse(response);
     } catch (err: any) {
-      setError(err.message || 'Failed to switch payment method');
-      // Keep previous method
+      setError(err.message || 'Failed to load payment method');
     } finally {
-      setLoading(false);
+      setMethodLoading(false);
     }
   };
 
@@ -218,7 +224,7 @@ export default function PaymentScreen() {
     Alert.alert('Copied', text);
   };
 
-  if (loading) {
+  if (!doctorId || !appointmentDate || !appointmentTime) {
     return (
       <View style={styles.container}>
         <LinearGradient
@@ -240,8 +246,7 @@ export default function PaymentScreen() {
           </SafeAreaView>
         </LinearGradient>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color="#a855f7" />
-          <Text style={styles.loadingText}>Preparing payment...</Text>
+          <Text style={styles.errorText}>{error || 'Missing appointment details'}</Text>
         </View>
       </View>
     );
@@ -330,7 +335,80 @@ export default function PaymentScreen() {
           </View>
         </Card>
 
+        {/* Payment Method Selector */}
+        <Card style={styles.methodCard}>
+          <Text style={styles.sectionTitle}>Select Payment Method</Text>
+
+          <Pressable
+            style={[
+              styles.dropdownButton,
+              paymentMethod === null && styles.dropdownButtonPlaceholder,
+            ]}
+            onPress={() => setShowPaymentMethodDropdown(!showPaymentMethodDropdown)}
+            disabled={methodLoading}
+          >
+            <Text
+              style={[
+                styles.dropdownButtonText,
+                paymentMethod === null && styles.dropdownButtonTextPlaceholder,
+              ]}
+            >
+              {getPaymentMethodLabel(paymentMethod)}
+            </Text>
+            {methodLoading ? (
+              <ActivityIndicator size="small" color="#a855f7" />
+            ) : (
+              <Text style={styles.dropdownArrow}>
+                {showPaymentMethodDropdown ? '▲' : '▼'}
+              </Text>
+            )}
+          </Pressable>
+
+          {showPaymentMethodDropdown && (
+            <View style={styles.dropdownMenu}>
+              {PAYMENT_METHOD_OPTIONS.map((option) => {
+                const isActive =
+                  option.value === paymentMethod ||
+                  (option.value === null && paymentMethod === null);
+
+                return (
+                  <Pressable
+                    key={option.value ?? 'none'}
+                    style={[
+                      styles.dropdownOption,
+                      isActive && styles.dropdownOptionActive,
+                    ]}
+                    onPress={() => handlePaymentMethodChange(option.value)}
+                    disabled={methodLoading}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        isActive && styles.dropdownOptionTextActive,
+                        option.value === null && styles.dropdownOptionNone,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+
+          {paymentMethod === null && !methodLoading && (
+            <Text style={styles.methodHint}>
+              Choose a payment method to continue with your booking.
+            </Text>
+          )}
+
+          {error && paymentMethod === null && (
+            <Text style={styles.errorText}>{error}</Text>
+          )}
+        </Card>
+
         {/* Payment Summary */}
+        {paymentMethod && (
         <Card style={styles.paymentCard}>
           <Text style={styles.sectionTitle}>Payment Amount</Text>
           {paymentResponse && (
@@ -338,83 +416,32 @@ export default function PaymentScreen() {
               <View style={styles.amountRow}>
                 <Text style={styles.amountLabel}>Consultation Fee</Text>
                 <Text style={styles.amount}>
-                  {formatPaymentAmount(paymentResponse.amount, paymentResponse.currency)}
+                  PKR {getPaymentAmountPkr(
+                    paymentResponse.amount,
+                    paymentResponse.currency,
+                    paymentResponse.fee_pkr
+                  )}
                 </Text>
               </View>
-              {paymentResponse.payment_method === 'easypaisa' && (
-                <View style={styles.amountRow}>
-                  <Text style={styles.amountLabel}>In PKR</Text>
-                  <Text style={styles.amount}>
-                    PKR {convertUsdToPkr(paymentResponse.amount)}
-                  </Text>
-                </View>
-              )}
               <View style={[styles.amountRow, styles.totalRow]}>
                 <Text style={styles.totalLabel}>Total</Text>
                 <Text style={styles.totalAmount}>
-                  {formatPaymentAmount(paymentResponse.amount, paymentResponse.currency)}
+                  PKR {getPaymentAmountPkr(
+                    paymentResponse.amount,
+                    paymentResponse.currency,
+                    paymentResponse.fee_pkr
+                  )}
                 </Text>
               </View>
             </>
           )}
         </Card>
+        )}
 
-        {/* Payment Method Selector */}
-        <Card style={styles.methodCard}>
-          <Text style={styles.sectionTitle}>Payment Method</Text>
-          <View style={styles.methodOptions}>
-            <Pressable
-              style={[
-                styles.methodOption,
-                paymentMethod === 'stripe' && styles.methodOptionActive,
-              ]}
-              onPress={() => handlePaymentMethodChange('stripe')}
-              disabled={loading}
-            >
-              <View
-                style={[
-                  styles.radio,
-                  paymentMethod === 'stripe' && styles.radioActive,
-                ]}
-              >
-                {paymentMethod === 'stripe' && (
-                  <View style={styles.radioDot} />
-                )}
-              </View>
-              <View style={styles.methodLabel}>
-                <Text style={styles.methodTitle}>Credit/Debit Card</Text>
-                <Text style={styles.methodSubtitle}>Instant confirmation</Text>
-              </View>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.methodOption,
-                paymentMethod === 'easypaisa' && styles.methodOptionActive,
-              ]}
-              onPress={() => handlePaymentMethodChange('easypaisa')}
-              disabled={loading}
-            >
-              <View
-                style={[
-                  styles.radio,
-                  paymentMethod === 'easypaisa' && styles.radioActive,
-                ]}
-              >
-                {paymentMethod === 'easypaisa' && (
-                  <View style={styles.radioDot} />
-                )}
-              </View>
-              <View style={styles.methodLabel}>
-                <Text style={styles.methodTitle}>Easypaisa Transfer</Text>
-                <Text style={styles.methodSubtitle}>Manual approval</Text>
-              </View>
-            </Pressable>
-          </View>
-        </Card>
+        {/* Stripe / Easypaisa forms follow below */}
 
         {/* Stripe Payment Form */}
-        {paymentMethod === 'stripe' && (
+        {paymentMethod === 'stripe' && paymentResponse?.payment_method === 'stripe' && (
           <Card style={styles.cardInputCard}>
             <View style={styles.cardInputHeader}>
               <CreditCard size={20} color="#a855f7" />
@@ -473,10 +500,11 @@ export default function PaymentScreen() {
 
             {error && <Text style={styles.errorText}>{error}</Text>}
 
-            <Button
-              title={processing ? 'Processing...' : 'Confirm Payment'}
+            <PatientPrimaryButton
+              label={processing ? 'Processing...' : 'Confirm Payment'}
               onPress={handleStripePayment}
               disabled={processing || !paymentResponse}
+              variant="accent"
               style={styles.payButton}
             />
           </Card>
@@ -508,7 +536,11 @@ export default function PaymentScreen() {
               <View style={styles.amountBox}>
                 <Text style={styles.amountBoxLabel}>Amount to Send</Text>
                 <Text style={styles.easypaisaAmount}>
-                  PKR {convertUsdToPkr(paymentResponse.amount)}
+                  PKR {getPaymentAmountPkr(
+                    paymentResponse.amount,
+                    paymentResponse.currency,
+                    paymentResponse.fee_pkr
+                  )}
                 </Text>
               </View>
 
@@ -516,7 +548,11 @@ export default function PaymentScreen() {
                 <Text style={styles.instructionsLabel}>Instructions:</Text>
                 <Text style={styles.instructions}>
                   1. Open Easypaisa app or visit an agent{'\n'}
-                  2. Send PKR {convertUsdToPkr(paymentResponse.amount)} to {(paymentResponse as EasypaisaPaymentResponse).receiver_number}{'\n'}
+                  2. Send PKR {getPaymentAmountPkr(
+                    paymentResponse.amount,
+                    paymentResponse.currency,
+                    paymentResponse.fee_pkr
+                  )} to {(paymentResponse as EasypaisaPaymentResponse).receiver_number}{'\n'}
                   3. Keep your transaction receipt{'\n'}
                   4. Submit proof below
                 </Text>
@@ -588,10 +624,11 @@ export default function PaymentScreen() {
 
               {error && <Text style={styles.errorText}>{error}</Text>}
 
-              <Button
-                title={processing ? 'Submitting...' : 'Submit Proof'}
+              <PatientPrimaryButton
+                label={processing ? 'Submitting...' : 'Submit Proof'}
                 onPress={handleEasypaisaSubmitProof}
                 disabled={processing || !easypaisaProof.value}
+                variant="accent"
                 style={styles.payButton}
               />
 
@@ -660,42 +697,67 @@ const styles = StyleSheet.create({
 
   // Method Selector
   methodCard: { gap: 12 },
-  methodOptions: { gap: 10 },
-  methodOption: {
+  dropdownButton: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
     borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
     backgroundColor: '#fff',
   },
-  methodOptionActive: {
-    borderColor: '#a855f7',
+  dropdownButtonPlaceholder: {
+    borderColor: '#e5e7eb',
+    backgroundColor: '#f9fafb',
+  },
+  dropdownButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  dropdownButtonTextPlaceholder: {
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  dropdownArrow: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  dropdownMenu: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+  },
+  dropdownOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  dropdownOptionActive: {
     backgroundColor: '#f3e8ff',
   },
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#d1d5db',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+  dropdownOptionText: {
+    fontSize: 14,
+    color: '#6b7280',
   },
-  radioActive: {
-    borderColor: '#a855f7',
+  dropdownOptionTextActive: {
+    color: '#a855f7',
+    fontWeight: '600',
   },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#a855f7',
+  dropdownOptionNone: {
+    fontStyle: 'italic',
   },
-  methodLabel: { flex: 1 },
-  methodTitle: { fontSize: 14, fontWeight: '600', color: '#1f2937' },
-  methodSubtitle: { fontSize: 12, color: '#6b7280' },
+  methodHint: {
+    fontSize: 13,
+    color: '#6b7280',
+    lineHeight: 18,
+  },
 
   // Card Input
   cardInputCard: { gap: 12 },

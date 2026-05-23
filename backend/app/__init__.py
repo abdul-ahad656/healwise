@@ -97,7 +97,7 @@ def create_app():
     @app.route("/health")
     def health():
         try:
-            if mongo.db:
+            if mongo.db is not None:
                 mongo.db.command('ping')
                 return jsonify({"status": "ok", "mongodb": "connected"}), 200
         except Exception as e:

@@ -17,6 +17,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatPaymentAmount } from '@/services/paymentService';
+import { API_BASE_URL } from '@/services/config';
+import AuthStore from '@/services/authStore';
 
 interface PendingPayment {
   _id: string;
@@ -47,31 +49,35 @@ export default function AdminPaymentsScreen() {
   const fetchPendingPayments = async () => {
     try {
       setError(null);
-      // TODO: Implement this endpoint call
-      // const response = await fetch(`${API_BASE_URL}/payments/admin/pending-easypaisa`, {
-      //   headers: { Authorization: `Bearer ${AuthStore.getToken()}` }
-      // });
-      // const data = await response.json();
-      // setPendingPayments(data.payments || []);
+      const token = AuthStore.getToken();
 
-      // Mock data for development
-      setPendingPayments([
-        {
-          _id: 'mock_1',
-          payment_id: 'pay_123',
-          userId: 'user_456',
-          amount: 5000,
-          status: 'pending_review',
-          easypaisa_proof_url: 'https://example.com/screenshot.jpg',
-          proof_submitted_at: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          doctor_name: 'Dr. Ali Khan',
-          appointment_date: '2026-05-25',
-          appointment_time: '14:30',
+      if (!token) {
+        setError('Not authenticated');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/payments/admin/pending-easypaisa`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
         },
-      ]);
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to fetch pending payments');
+        setPendingPayments([]);
+        return;
+      }
+
+      // Extract payments from response
+      const payments = data.payments || [];
+      setPendingPayments(payments);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch pending payments');
+      setPendingPayments([]);
     } finally {
       setLoading(false);
     }
@@ -82,22 +88,35 @@ export default function AdminPaymentsScreen() {
     setError(null);
 
     try {
-      // TODO: Implement this endpoint call
-      // const response = await fetch(`${API_BASE_URL}/payments/admin/confirm-payment`, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': `Bearer ${AuthStore.getToken()}`,
-      //   },
-      //   body: JSON.stringify({
-      //     payment_id: paymentId,
-      //     admin_notes: notes[paymentId] || '',
-      //   }),
-      // });
+      const token = AuthStore.getToken();
+      if (!token) {
+        Alert.alert('Error', 'Not authenticated');
+        setConfirming(null);
+        return;
+      }
 
-      // Mock success
+      const response = await fetch(`${API_BASE_URL}/payments/admin/confirm-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          payment_id: paymentId,
+          admin_notes: notes[paymentId] || '',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        Alert.alert('Error', data.error || 'Failed to confirm payment');
+        setConfirming(null);
+        return;
+      }
+
       Alert.alert('Success', 'Payment confirmed! Appointment created.');
-      setPendingPayments(pendingPayments.filter(p => p.payment_id !== paymentId));
+      setPendingPayments(pendingPayments.filter(p => p._id !== paymentId));
       setNotes({ ...notes, [paymentId]: '' });
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to confirm payment');
@@ -189,7 +208,7 @@ export default function AdminPaymentsScreen() {
           </View>
         ) : (
           pendingPayments.map((payment) => (
-            <Card key={payment.payment_id} style={styles.paymentCard}>
+            <Card key={payment._id} style={styles.paymentCard}>
               {/* Payment Status Header */}
               <View style={styles.cardHeader}>
                 <View style={styles.statusBadge}>
@@ -260,11 +279,11 @@ export default function AdminPaymentsScreen() {
                   placeholder="Add verification notes..."
                   multiline
                   numberOfLines={3}
-                  value={notes[payment.payment_id] || ''}
+                  value={notes[payment._id] || ''}
                   onChangeText={(text) =>
-                    setNotes({ ...notes, [payment.payment_id]: text })
+                    setNotes({ ...notes, [payment._id]: text })
                   }
-                  editable={confirming !== payment.payment_id}
+                  editable={confirming !== payment._id}
                 />
               </View>
 
@@ -291,9 +310,9 @@ export default function AdminPaymentsScreen() {
 
                 <Button
                   title={
-                    confirming === payment.payment_id ? 'Confirming...' : 'Confirm Payment'
+                    confirming === payment._id ? 'Confirming...' : 'Confirm Payment'
                   }
-                  onPress={() => handleConfirmPayment(payment.payment_id)}
+                  onPress={() => handleConfirmPayment(payment._id)}
                   disabled={confirming !== null}
                   style={styles.confirmButton}
                 />

@@ -3,6 +3,7 @@ from app.extensions import mongo
 from bson.objectid import ObjectId
 from werkzeug.security import generate_password_hash
 from datetime import datetime
+from app.models.user_model import normalize_consultation_fee_for_storage
 
 def get_doctors():
     doctors = list(mongo.db.users.find({"role": "doctor"}))
@@ -41,6 +42,14 @@ def create_doctor():
     if mongo.db.users.find_one({"email": data["email"]}):
         return jsonify({"error": "Email already exists"}), 409
 
+    consultation_fee = normalize_consultation_fee_for_storage(
+        data.get("consultationFee")
+    )
+    if consultation_fee is None:
+        return jsonify({
+            "error": "Consultation fee (PKR) is required when creating a doctor"
+        }), 400
+
     doctor = {
         "name": data["name"],
         "email": data["email"],
@@ -50,7 +59,7 @@ def create_doctor():
         "specialization": data.get("specialization"),
         "experience": data.get("experience"),
         "hospital": data.get("hospital"),
-        "consultationFee": data.get("consultationFee"),
+        "consultationFee": consultation_fee,
         "active": True,
         "createdAt": datetime.utcnow()
     }
@@ -73,9 +82,14 @@ def update_doctor(doctor_id):
 
     update_fields = {}
 
-    for field in ["name", "email", "language", "specialization", "experience", "hospital", "consultationFee"]:
+    for field in ["name", "email", "language", "specialization", "experience", "hospital"]:
         if field in data:
             update_fields[field] = data[field]
+
+    if "consultationFee" in data:
+        update_fields["consultationFee"] = normalize_consultation_fee_for_storage(
+            data.get("consultationFee")
+        )
 
     if "password" in data and data["password"]:
         update_fields["password"] = generate_password_hash(data["password"])

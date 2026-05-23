@@ -131,48 +131,34 @@ def refund_payment(payment_intent_id, amount=None):
 
 def get_doctor_consultation_price(doctor_id, mongo_db=None):
     """
-    CRITICAL: Fetch verified consultation price from doctor record.
+    Fetch consultation fee from the doctor's user document (set by admin).
 
-    Never trust frontend price input. Always fetch from database.
-
-    Args:
-        doctor_id: Doctor's ObjectId
-        mongo_db: MongoDB database instance (injected for testing)
+    Never trust frontend price input.
 
     Returns:
-        Price in cents (e.g., 5000 = $50 USD or PKR 1,550)
-
-    Raises:
-        PaymentMethodError if doctor not found or price not set
+        (amount_minor, currency, fee_pkr, doctor)
+        - amount_minor: smallest currency unit (paisa for PKR)
+        - currency: "pkr"
+        - fee_pkr: fee in Pakistani Rupees as float
     """
     try:
-        # Import here to avoid circular imports
-        from app.extensions import mongo
-        db = mongo_db or mongo.db
+        from app.models.user_model import find_doctor_by_id, parse_consultation_fee_pkr
 
-        # Convert to ObjectId if string
-        if isinstance(doctor_id, str):
-            doctor_id = ObjectId(doctor_id)
-
-        doctor = db.users.find_one({
-            "_id": doctor_id,
-            "role": "doctor"
-        })
-
+        doctor = find_doctor_by_id(doctor_id)
         if not doctor:
             raise PaymentMethodError("Doctor not found or is not a doctor")
 
-        consultation_fee = doctor.get("consultationFee")
-        if consultation_fee is None or consultation_fee <= 0:
+        fee_pkr = parse_consultation_fee_pkr(doctor)
+        if fee_pkr is None:
             raise PaymentMethodError(
-                f"Doctor's consultation fee not set. Please set consultation fee in doctor profile."
+                "Doctor consultation fee is not set. "
+                "Ask an admin to set it when creating or editing the doctor."
             )
 
-        # Convert to cents (multiply by 100 if storing as decimal)
-        # Assuming consultationFee is stored as decimal (e.g., 50.00 for $50)
-        price_in_cents = int(float(consultation_fee) * 100)
+        amount_minor = int(round(fee_pkr * 100))
+        currency = "pkr"
 
-        return price_in_cents, doctor
+        return amount_minor, currency, fee_pkr, doctor
 
     except PaymentMethodError:
         raise

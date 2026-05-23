@@ -4,7 +4,8 @@ from app.controllers.appointment_controller import (
     book_appointment,
     get_my_appointments,
     doctor_appointments,
-    update_appointment_status
+    update_appointment_status,
+    start_consultation
 )
 from app.utils.role_guard import doctor_required
 
@@ -37,3 +38,12 @@ def update(appointment_id):
     if not doctor_required():
         return {"error": "Doctor only"}, 403
     return update_appointment_status(appointment_id)
+
+
+# Doctor starts consultation
+@appointment_bp.post("/start-consultation/<appointment_id>")
+@jwt_required()
+def start_consult(appointment_id):
+    if not doctor_required():
+        return {"error": "Doctor only"}, 403
+    return start_consultation(appointment_id)

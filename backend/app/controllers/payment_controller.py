@@ -15,6 +15,7 @@ from app.models.payment_model import (
     update_payment_to_paid,
     get_pending_easypaisa_payments,
     find_payment_by_id,
+    payment_has_booked_appointment,
 )
 from app.models.user_model import find_user_by_id
 from app.services.payment_service import (
@@ -64,8 +65,12 @@ def create_payment_handler():
         payment_method = data.get("payment_method", "stripe")
         symptom_id = data.get("symptom_id")
 
+        # Debug logging
+        current_app.logger.info(f"Payment request - doctor_id: {doctor_id}, appointment_id: {appointment_id}, date: {appointment_date}, time: {appointment_time}, method: {payment_method}")
+
         # Validate required fields
         if not all([doctor_id, appointment_date, appointment_time, appointment_id]):
+            current_app.logger.error(f"Missing fields: doctor_id={doctor_id}, appointment_id={appointment_id}, date={appointment_date}, time={appointment_time}")
             return jsonify({
                 "error": "Missing required fields: doctor_id, appointment_id, appointment_date, appointment_time"
             }), 400
@@ -76,10 +81,8 @@ def create_payment_handler():
         except PaymentMethodError as e:
             return jsonify({"error": str(e)}), 400
 
-        # Validate appointment_id format
-        try:
-            appointment_id_obj = ObjectId(appointment_id)
-        except:
+        # Validate appointment_id format (it's a tracking ID, not an ObjectId yet)
+        if not appointment_id or not isinstance(appointment_id, str):
             return jsonify({"error": "Invalid appointment ID"}), 400
 
         # Check doctor exists and is active
@@ -97,15 +100,17 @@ def create_payment_handler():
 
         # CRITICAL: Fetch doctor consultation price from database
         try:
-            amount, doctor = get_doctor_consultation_price(doctor_id, mongo.db)
+            amount, currency, fee_pkr, doctor = get_doctor_consultation_price(
+                doctor_id, mongo.db
+            )
         except PaymentMethodError as e:
             return jsonify({"error": str(e)}), 400
 
-        # Check doctor has availability at this time
+        # Check doctor has availability at this time (slots is an array on the day doc)
         slot_exists = mongo.db.doctor_availability.find_one({
             "doctorId": doctor_id,
             "day": appointment_date,
-            "slots": appointment_time
+            "slots": {"$in": [appointment_time]},
         })
 
         if not slot_exists:
@@ -124,7 +129,7 @@ def create_payment_handler():
 
         # Check no active payment for this appointment already
         try:
-            if check_active_payment_for_appointment(appointment_id_obj):
+            if check_active_payment_for_appointment(appointment_id):
                 return jsonify({
                     "error": "This appointment already has an active payment. Please check your payment history."
                 }), 409
@@ -134,13 +139,29 @@ def create_payment_handler():
         # Route based on payment method
         if payment_method == "stripe":
             return _handle_stripe_payment(
-                user_id, doctor_id, appointment_id_obj, appointment_date,
-                appointment_time, amount, doctor, symptom_id
+                user_id,
+                doctor_id,
+                appointment_id,
+                appointment_date,
+                appointment_time,
+                amount,
+                currency,
+                fee_pkr,
+                doctor,
+                symptom_id,
             )
         elif payment_method == "easypaisa":
             return _handle_easypaisa_payment(
-                user_id, doctor_id, appointment_id_obj, appointment_date,
-                appointment_time, amount, doctor, symptom_id
+                user_id,
+                doctor_id,
+                appointment_id,
+                appointment_date,
+                appointment_time,
+                amount,
+                currency,
+                fee_pkr,
+                doctor,
+                symptom_id,
             )
         else:
             return jsonify({"error": "Unsupported payment method"}), 400
@@ -149,11 +170,20 @@ def create_payment_handler():
         return jsonify({"error": f"Internal error: {str(e)}"}), 500
 
 
-def _handle_stripe_payment(user_id, doctor_id, appointment_id, appointment_date,
-                          appointment_time, amount, doctor, symptom_id):
+def _handle_stripe_payment(
+    user_id,
+    doctor_id,
+    appointment_id,
+    appointment_date,
+    appointment_time,
+    amount,
+    currency,
+    fee_pkr,
+    doctor,
+    symptom_id,
+):
     """Handle Stripe payment method."""
     try:
-        currency = "usd"
 
         # Create Stripe PaymentIntent
         try:
@@ -175,6 +205,7 @@ def _handle_stripe_payment(user_id, doctor_id, appointment_id, appointment_date,
             "userId": user_id,
             "doctorId": doctor_id,
             "appointmentId": appointment_id,
+            "appointmentTrackingId": appointment_id,
             "payment_method": "stripe",
             "stripe_payment_intent_id": stripe_intent.id,
             "stripe_client_secret": stripe_intent.client_secret,
@@ -182,13 +213,14 @@ def _handle_stripe_payment(user_id, doctor_id, appointment_id, appointment_date,
             "currency": currency,
             "status": "pending",
             "amount_verified_at": datetime.utcnow(),
-            "doctor_consultation_price": amount / 100,  # Store original price
+            "doctor_consultation_price": fee_pkr,
             "metadata": {
                 "appointmentDate": appointment_date,
                 "appointmentTime": appointment_time,
                 "doctorId": doctor_id,
                 "doctorName": doctor.get("name", "Doctor"),
                 "symptomId": symptom_id,
+                "feePkr": fee_pkr,
             },
             "createdAt": datetime.utcnow(),
             "updatedAt": datetime.utcnow(),
@@ -205,6 +237,7 @@ def _handle_stripe_payment(user_id, doctor_id, appointment_id, appointment_date,
             "paymentId": str(payment_id),
             "amount": amount,
             "currency": currency,
+            "fee_pkr": fee_pkr,
             "message": "Payment intent created successfully"
         }), 200
 
@@ -212,11 +245,20 @@ def _handle_stripe_payment(user_id, doctor_id, appointment_id, appointment_date,
         return jsonify({"error": f"Stripe payment error: {str(e)}"}), 500
 
 
-def _handle_easypaisa_payment(user_id, doctor_id, appointment_id, appointment_date,
-                             appointment_time, amount, doctor, symptom_id):
+def _handle_easypaisa_payment(
+    user_id,
+    doctor_id,
+    appointment_id,
+    appointment_date,
+    appointment_time,
+    amount,
+    currency,
+    fee_pkr,
+    doctor,
+    symptom_id,
+):
     """Handle Easypaisa manual payment method."""
     try:
-        currency = "usd"
         receiver_number = current_app.config.get("EASYPAISA_RECEIVER_NUMBER")
 
         # Create payment record with pending status (NOT auto-confirmed)
@@ -224,12 +266,13 @@ def _handle_easypaisa_payment(user_id, doctor_id, appointment_id, appointment_da
             "userId": user_id,
             "doctorId": doctor_id,
             "appointmentId": appointment_id,
+            "appointmentTrackingId": appointment_id,
             "payment_method": "easypaisa",
             "amount": amount,
             "currency": currency,
             "status": "pending",  # Waiting for user to send payment
             "amount_verified_at": datetime.utcnow(),
-            "doctor_consultation_price": amount / 100,
+            "doctor_consultation_price": fee_pkr,
             "easypaisa_receiver": receiver_number,
             "metadata": {
                 "appointmentDate": appointment_date,
@@ -252,11 +295,12 @@ def _handle_easypaisa_payment(user_id, doctor_id, appointment_id, appointment_da
             "receiver_number": receiver_number,
             "amount": amount,
             "currency": currency,
+            "fee_pkr": fee_pkr,
             "paymentId": str(payment_id),
             "status": "pending",
             "instructions": (
                 f"Send payment to Easypaisa number: {receiver_number}\n"
-                f"Amount: PKR (amount will be calculated by Easypaisa)\n"
+                f"Amount: PKR {int(fee_pkr) if fee_pkr == int(fee_pkr) else fee_pkr}\n"
                 f"After payment, submit your transaction proof using your Payment ID: {str(payment_id)}\n"
                 f"Our admin team will verify and confirm your booking."
             )
@@ -399,28 +443,49 @@ def admin_confirm_payment_handler():
         except Exception as e:
             return jsonify({"error": f"Failed to confirm payment: {str(e)}"}), 500
 
-        # Update appointment to confirmed
+        # Create appointment record from payment details
         try:
-            if payment.get("appointmentId"):
-                appointment_id = ObjectId(payment["appointmentId"])
-                mongo.db.appointments.update_one(
-                    {"_id": appointment_id},
-                    {
-                        "$set": {
-                            "status": "confirmed",
-                            "paymentStatus": "paid",
-                            "updatedAt": datetime.utcnow()
-                        }
-                    }
-                )
+            appointment_date = payment.get("metadata", {}).get("appointmentDate")
+            appointment_time = payment.get("metadata", {}).get("appointmentTime")
+            doctor_id = payment.get("doctorId")
+            patient_id = payment.get("userId")
+            symptom_id = payment.get("metadata", {}).get("symptomId")
+
+            if not all([appointment_date, appointment_time, doctor_id, patient_id]):
+                current_app.logger.error(f"Missing appointment data in payment: {payment_id}")
+                return jsonify({"error": "Cannot create appointment: missing payment details"}), 400
+
+            # Create appointment
+            appointment = {
+                "patientId": patient_id,
+                "doctorId": doctor_id,
+                "symptomId": symptom_id,
+                "appointmentDate": appointment_date,
+                "appointmentTime": appointment_time,
+                "status": "confirmed",
+                "paymentStatus": "paid",
+                "paymentId": payment_id_obj,
+                "createdAt": datetime.utcnow(),
+                "updatedAt": datetime.utcnow()
+            }
+
+            result = mongo.db.appointments.insert_one(appointment)
+            appointment_id = str(result.inserted_id)
+
+            # Link appointment back to payment
+            mongo.db.payments.update_one(
+                {"_id": payment_id_obj},
+                {"$set": {"appointmentRecordId": ObjectId(appointment_id)}}
+            )
+
         except Exception as e:
-            print(f"Warning: Failed to update appointment status: {str(e)}")
-            # Don't fail payment confirmation if appointment update fails
+            current_app.logger.error(f"Failed to create appointment: {str(e)}")
+            return jsonify({"error": f"Payment confirmed but failed to create appointment: {str(e)}"}), 500
 
         return jsonify({
             "message": "Payment confirmed successfully. Booking is now active.",
             "payment_id": payment_id,
-            "appointment_id": str(payment.get("appointmentId")) if payment.get("appointmentId") else None,
+            "appointment_id": appointment_id,
             "status": "paid"
         }), 200
 
@@ -482,13 +547,13 @@ def handle_webhook():
                 print(f"Failed to update payment status: {str(e)}")
                 return jsonify({"status": "received"}), 200
 
-            # Create appointment if not already created
-            if not payment.get("appointmentId"):
+            # Create appointment record after successful payment (tracking id is not an ObjectId)
+            if not payment_has_booked_appointment(payment):
                 try:
                     metadata = payment.get("metadata", {})
                     appointment = {
                         "patientId": payment["userId"],
-                        "doctorId": metadata.get("doctorId"),
+                        "doctorId": metadata.get("doctorId") or payment.get("doctorId"),
                         "symptomId": metadata.get("symptomId"),
                         "appointmentDate": metadata.get("appointmentDate"),
                         "appointmentTime": metadata.get("appointmentTime"),
@@ -496,23 +561,22 @@ def handle_webhook():
                         "paymentId": str(payment_id),
                         "paymentStatus": "paid",
                         "requiresPayment": True,
+                        "trackingId": payment.get("appointmentTrackingId")
+                        or payment.get("appointmentId"),
                         "createdAt": datetime.utcnow(),
                     }
 
                     result = mongo.db.appointments.insert_one(appointment)
-                    appointment_id = result.inserted_id
+                    booked_id = result.inserted_id
 
-                    # Update payment with appointment ID
                     update_payment_status(
                         payment_id,
                         "paid",
-                        {"appointmentId": appointment_id}
+                        {"appointmentRecordId": booked_id},
                     )
 
                 except Exception as e:
                     print(f"Failed to create appointment after payment: {str(e)}")
-                    # Payment succeeded but appointment creation failed - don't fail webhook
-                    pass
 
         # Handle payment_intent.payment_failed
         elif event_type == "payment_intent.payment_failed":
@@ -547,17 +611,22 @@ def get_payment_history():
 
         # Enrich with appointment details
         for payment in payments:
-            if payment.get("appointmentId"):
+            record_id = payment.get("appointmentRecordId") or payment.get("appointmentId")
+            if record_id:
                 try:
-                    appointment = mongo.db.appointments.find_one(
-                        {"_id": ObjectId(payment["appointmentId"])}
-                    )
-                    if appointment:
-                        payment["appointmentDate"] = appointment.get("appointmentDate")
-                        payment["appointmentTime"] = appointment.get("appointmentTime")
-                        payment["appointmentStatus"] = appointment.get("status")
-                except:
+                    if ObjectId.is_valid(str(record_id)):
+                        appointment = mongo.db.appointments.find_one(
+                            {"_id": ObjectId(record_id)}
+                        )
+                        if appointment:
+                            payment["appointmentDate"] = appointment.get("appointmentDate")
+                            payment["appointmentTime"] = appointment.get("appointmentTime")
+                            payment["appointmentStatus"] = appointment.get("status")
+                except Exception:
                     pass
+            elif payment.get("metadata"):
+                payment["appointmentDate"] = payment["metadata"].get("appointmentDate")
+                payment["appointmentTime"] = payment["metadata"].get("appointmentTime")
 
         return jsonify(payments), 200
 
@@ -633,10 +702,13 @@ def refund_payment_handler():
             return jsonify({"error": f"Failed to record refund: {str(e)}"}), 500
 
         # Cancel appointment if it exists
-        if payment.get("appointmentId"):
+        if payment.get("appointmentRecordId") or (
+            payment.get("appointmentId") and ObjectId.is_valid(str(payment["appointmentId"]))
+        ):
             try:
+                record_id = payment.get("appointmentRecordId") or payment["appointmentId"]
                 mongo.db.appointments.update_one(
-                    {"_id": ObjectId(payment["appointmentId"])},
+                    {"_id": ObjectId(record_id)},
                     {
                         "$set": {
                             "status": "cancelled",

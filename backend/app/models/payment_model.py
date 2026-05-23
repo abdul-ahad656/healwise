@@ -4,6 +4,42 @@ from datetime import datetime
 from pymongo.errors import PyMongoError
 
 
+def _is_object_id(value) -> bool:
+    """Check if value is a valid MongoDB ObjectId."""
+    if value is None:
+        return False
+    try:
+        # A valid ObjectId is exactly 24 hexadecimal characters
+        if not isinstance(value, str) or len(str(value)) != 24:
+            return False
+        # Try to create it - if it fails, it's not valid
+        ObjectId(str(value))
+        return True
+    except Exception:
+        return False
+
+
+def _appointment_ref_filter(appointment_ref: str) -> dict:
+    """
+    Match payments by client tracking id (appt_...) or MongoDB appointment _id.
+    Payments store the tracking id in appointmentId / appointmentTrackingId until
+    a real appointment row exists (appointmentRecordId).
+    """
+    clauses = [
+        {"appointmentId": appointment_ref},
+        {"appointmentTrackingId": appointment_ref},
+    ]
+    if _is_object_id(appointment_ref):
+        oid = ObjectId(appointment_ref)
+        clauses.extend([
+            {"appointmentId": oid},
+            {"appointmentRecordId": oid},
+        ])
+    if len(clauses) == 1:
+        return clauses[0]
+    return {"$or": clauses}
+
+
 def create_payment(payment_data):
     """Insert a new payment record."""
     try:
@@ -54,21 +90,21 @@ def get_user_payments(user_id, limit=50):
             .limit(limit)
         )
 
-        # Serialize ObjectIds to strings
         for payment in payments:
             payment["_id"] = str(payment["_id"])
-            if "appointmentId" in payment and payment["appointmentId"]:
-                payment["appointmentId"] = str(payment["appointmentId"])
+            for key in ("appointmentId", "appointmentRecordId", "appointmentTrackingId"):
+                if key in payment and payment[key] is not None:
+                    payment[key] = str(payment[key])
 
         return payments
     except PyMongoError as e:
         raise Exception(f"Failed to retrieve payments: {str(e)}")
 
 
-def find_appointment_payment(appointment_id):
-    """Find payment associated with an appointment."""
+def find_appointment_payment(appointment_ref):
+    """Find payment associated with a tracking id or booked appointment id."""
     try:
-        return mongo.db.payments.find_one({"appointmentId": ObjectId(appointment_id)})
+        return mongo.db.payments.find_one(_appointment_ref_filter(appointment_ref))
     except (PyMongoError, Exception) as e:
         raise Exception(f"Failed to find appointment payment: {str(e)}")
 
@@ -92,12 +128,12 @@ def update_payment_with_refund(payment_id, refund_id, refund_status="succeeded")
         raise Exception(f"Failed to update refund: {str(e)}")
 
 
-def check_active_payment_for_appointment(appointment_id):
-    """Check if appointment already has an active payment (pending or paid)."""
+def check_active_payment_for_appointment(appointment_ref):
+    """Check if this booking reference already has an active payment."""
     try:
         payment = mongo.db.payments.find_one({
-            "appointmentId": ObjectId(appointment_id),
-            "status": {"$in": ["pending", "pending_review", "paid"]}
+            **_appointment_ref_filter(appointment_ref),
+            "status": {"$in": ["pending", "pending_review", "paid"]},
         })
         return payment is not None
     except (PyMongoError, Exception) as e:
@@ -112,7 +148,6 @@ def submit_payment_proof(payment_id, proof_data):
             "updatedAt": datetime.utcnow()
         }
 
-        # Store proof based on type
         if proof_data.get("proof_type") == "screenshot":
             update_dict["easypaisa_proof_url"] = proof_data.get("proof")
         elif proof_data.get("proof_type") == "transaction_id":
@@ -164,11 +199,11 @@ def get_pending_easypaisa_payments(limit=50):
             .limit(limit)
         )
 
-        # Serialize ObjectIds
         for payment in payments:
             payment["_id"] = str(payment["_id"])
-            if "appointmentId" in payment and payment["appointmentId"]:
-                payment["appointmentId"] = str(payment["appointmentId"])
+            for key in ("appointmentId", "appointmentRecordId", "appointmentTrackingId"):
+                if key in payment and payment[key] is not None:
+                    payment[key] = str(payment[key])
             if "userId" in payment:
                 payment["userId"] = str(payment["userId"])
 
@@ -184,3 +219,18 @@ def find_payment_by_stripe_intent(stripe_intent_id):
     except (PyMongoError, Exception) as e:
         raise Exception(f"Failed to find payment: {str(e)}")
 
+
+def payment_has_booked_appointment(payment) -> bool:
+    """True if payment is already linked to a row in appointments collection."""
+    if not payment:
+        return False
+
+    record_id = payment.get("appointmentRecordId")
+    if record_id and _is_object_id(record_id):
+        return mongo.db.appointments.find_one({"_id": ObjectId(record_id)}) is not None
+
+    legacy_id = payment.get("appointmentId")
+    if legacy_id and _is_object_id(legacy_id):
+        return mongo.db.appointments.find_one({"_id": ObjectId(legacy_id)}) is not None
+
+    return False

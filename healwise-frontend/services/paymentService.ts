@@ -9,6 +9,7 @@ export interface StripePaymentResponse {
   paymentId: string;
   amount: number;
   currency: string;
+  fee_pkr?: number;
   message: string;
 }
 
@@ -17,6 +18,7 @@ export interface EasypaisaPaymentResponse {
   receiver_number: string;
   amount: number;
   currency: string;
+  fee_pkr?: number;
   paymentId: string;
   status: string;
   instructions: string;
@@ -74,30 +76,36 @@ export const createPayment = async (
   }
 
   try {
+    const requestBody = {
+      appointment_id: appointmentId,
+      appointment_date: appointmentDate,
+      appointment_time: appointmentTime,
+      doctor_id: doctorId,
+      payment_method: paymentMethod,
+      symptom_id: symptomId,
+    };
+
+    console.log('Payment request body:', requestBody);
+
     const response = await fetch(`${API_BASE_URL}/payments/create-payment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        appointment_id: appointmentId,
-        appointment_date: appointmentDate,
-        appointment_time: appointmentTime,
-        doctor_id: doctorId,
-        payment_method: paymentMethod,
-        symptom_id: symptomId,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to create payment');
+      const errorMessage = data.error || data.message || JSON.stringify(data) || 'Failed to create payment';
+      throw new Error(errorMessage);
     }
 
     return data as PaymentResponse;
   } catch (error: any) {
+    console.error('Payment error:', error);
     throw new Error(error.message || 'Network error');
   }
 };
@@ -262,12 +270,20 @@ export const formatPaymentAmount = (amountInCents: number, currency: string = 'U
 };
 
 /**
- * Convert USD cents to PKR for Easypaisa display.
- * Rough conversion: 1 USD = 278 PKR (adjust based on current rates)
+ * Display PKR amount from payment API (doctor consultationFee from users collection).
  */
-export const convertUsdToPkr = (amountInCents: number, exchangeRate: number = 278): number => {
-  const amountInUsd = amountInCents / 100;
-  return Math.round(amountInUsd * exchangeRate);
+export const getPaymentAmountPkr = (
+  amountMinor: number,
+  currency?: string,
+  feePkr?: number
+): number => {
+  if (feePkr != null && feePkr > 0) {
+    return feePkr;
+  }
+  if (currency?.toLowerCase() === 'pkr') {
+    return amountMinor / 100;
+  }
+  return amountMinor / 100;
 };
 
 /**
