@@ -17,6 +17,7 @@ from .routes.health_tips_routes import health_tips_bp
 from .routes.medicine_type_routes import medicine_type_bp
 from .routes.prescription_routes import prescription_bp
 from .routes.predict_routes import predict_bp
+from .routes.payment_routes import payment_bp
 
 from .config import Config
 
@@ -72,6 +73,7 @@ def create_app():
         app.register_blueprint(health_tips_bp, url_prefix="/api/health-tips")
         app.register_blueprint(medicine_type_bp, url_prefix="/api/medicine-awareness")
         app.register_blueprint(prescription_bp, url_prefix="/api/prescriptions")
+        app.register_blueprint(payment_bp, url_prefix="/api/payments")
 
         # HF branch addition
         app.register_blueprint(predict_bp)

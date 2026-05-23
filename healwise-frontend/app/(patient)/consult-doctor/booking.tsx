@@ -78,23 +78,18 @@ export default function DoctorBooking() {
 
     setError(null);
     setSuccessMessage(null);
-    setBooking(true);
-    try {
-      await bookAppointment(
-        doctorId as string,
-        selectedDay,
-        selectedSlot,
-        symptomId as string | undefined
-      );
-      setSuccessMessage('Appointment booked successfully');
-      setTimeout(() => {
-        router.back();
-      }, 800);
-    } catch (err: any) {
-      setError(err.message || 'Failed to book appointment');
-    } finally {
-      setBooking(false);
-    }
+
+    // Navigate to payment screen (payment initiates appointment booking)
+    router.push({
+      pathname: '/(patient)/payment',
+      params: {
+        doctorId,
+        doctorName,
+        appointmentDate: selectedDay,
+        appointmentTime: selectedSlot,
+        symptomId,
+      },
+    });
   };
 
   return (
