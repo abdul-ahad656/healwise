@@ -1,12 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import {
+  StyleSheet,
+  View,
+  Text,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Upload, FileText, CheckCircle } from 'lucide-react-native';
+import { FileText, CheckCircle } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Card } from '@/components/ui/card';
-import { getDoctorAppointments, uploadPrescription } from '@/services/doctorPanelService';
-import { Appointment } from '@/services/doctorPanelService';
+import { DoctorScreenHeader } from '@/components/doctor/DoctorScreenHeader';
+import { DoctorPrimaryButton } from '@/components/doctor/DoctorPrimaryButton';
+import { doctorScreenStyles as s } from '@/styles/doctorScreen';
+import {
+  getDoctorAppointments,
+  uploadPrescription,
+  Appointment,
+} from '@/services/doctorPanelService';
 
 interface AugmentedAppointment extends Appointment {
   prescriptionUploaded?: boolean;
@@ -17,7 +29,6 @@ export default function UploadPrescriptionScreen() {
   const [appointments, setAppointments] = useState<AugmentedAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<string | null>(null);
-  const [uploadingNotes, setUploadingNotes] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
     loadAppointments();
@@ -26,10 +37,9 @@ export default function UploadPrescriptionScreen() {
   const loadAppointments = async () => {
     try {
       const data = await getDoctorAppointments();
-      const filtered = data.filter(
-        (a) => a.status === 'completed' || a.status === 'accepted'
+      setAppointments(
+        data.filter((a) => a.status === 'completed' || a.status === 'accepted')
       );
-      setAppointments(filtered);
     } catch (error) {
       Alert.alert('Error', 'Failed to load appointments');
       console.error(error);
@@ -66,23 +76,20 @@ export default function UploadPrescriptionScreen() {
     }
   };
 
-  const handleUpload = async (appointmentId: string, fileUri: string, fileName: string) => {
+  const handleUpload = async (
+    appointmentId: string,
+    fileUri: string,
+    fileName: string
+  ) => {
     setUploading(appointmentId);
     try {
-      const notes = uploadingNotes[appointmentId] || '';
-      await uploadPrescription(appointmentId, fileUri, fileName, notes);
-
+      await uploadPrescription(appointmentId, fileUri, fileName, '');
       Alert.alert('Success', 'Prescription uploaded successfully');
-      setUploadingNotes((prev) => {
-        const updated = { ...prev };
-        delete updated[appointmentId];
-        return updated;
-      });
-
-      const updated = appointments.map((a) =>
-        a._id === appointmentId ? { ...a, prescriptionUploaded: true } : a
+      setAppointments((prev) =>
+        prev.map((a) =>
+          a._id === appointmentId ? { ...a, prescriptionUploaded: true } : a
+        )
       );
-      setAppointments(updated);
     } catch (error: any) {
       Alert.alert('Upload Failed', error.message || 'Failed to upload prescription');
       console.error(error);
@@ -92,221 +99,134 @@ export default function UploadPrescriptionScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f9fafb' }]} />
+    <View style={s.container}>
+      <View style={[StyleSheet.absoluteFill, s.pageBg]} />
 
-      <LinearGradient
-        colors={['#22c55e', '#3b82f6']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
+      <DoctorScreenHeader
+        title="Upload Prescriptions"
+        subtitle="Share prescriptions with your patients"
+        onBack={() => router.back()}
+      />
+
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <SafeAreaView>
-          <View style={styles.headerContent}>
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [
-                styles.backButton,
-                { opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <ArrowLeft size={20} color="#ffffff" />
-            </Pressable>
-            <View>
-              <Text style={styles.headerTitle}>Upload Prescriptions</Text>
-              <Text style={styles.headerSubtitle}>Share prescriptions with your patients</Text>
-            </View>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
-
-      <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
         {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#22c55e" />
-            <Text style={styles.loadingText}>Loading appointments...</Text>
+          <View style={local.center}>
+            <ActivityIndicator size="large" color="#1d4ed8" />
+            <Text style={s.infoText}>Loading appointments...</Text>
           </View>
         ) : appointments.length === 0 ? (
-          <Card style={styles.emptyCard}>
-            <FileText size={48} color="#d1d5db" />
-            <Text style={styles.emptyTitle}>No Appointments</Text>
-            <Text style={styles.emptyText}>
+          <Card style={local.emptyCard}>
+            <FileText size={48} color="#9ca3af" />
+            <Text style={local.emptyTitle}>No appointments</Text>
+            <Text style={local.emptyText}>
               You have no completed or accepted appointments yet.
             </Text>
           </Card>
         ) : (
           appointments.map((appointment) => (
-            <Card key={appointment._id} style={styles.appointmentCard}>
-              <View style={styles.appointmentHeader}>
-                <View style={styles.appointmentInfo}>
-                  <Text style={styles.patientName}>{appointment.patientName || 'Patient'}</Text>
-                  <Text style={styles.appointmentTime}>
+            <Card key={appointment._id} style={s.listCard}>
+              <View style={local.cardHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.listCardTitle}>
+                    {appointment.patientName || 'Patient'}
+                  </Text>
+                  <Text style={s.listCardMeta}>
                     {appointment.appointmentDate} at {appointment.appointmentTime}
                   </Text>
-                  <View style={styles.statusBadge}>
-                    <Text style={styles.statusText}>{appointment.status}</Text>
+                  <View style={local.badge}>
+                    <Text style={local.badgeText}>{appointment.status}</Text>
                   </View>
                 </View>
-
-                {appointment.prescriptionUploaded && (
-                  <CheckCircle size={24} color="#22c55e" />
-                )}
+                {appointment.prescriptionUploaded ? (
+                  <CheckCircle size={28} color="#16a34a" />
+                ) : null}
               </View>
 
-              {!appointment.prescriptionUploaded && (
-                <View style={styles.uploadSection}>
-                  <Pressable
-                    onPress={() => handlePickFile(appointment._id)}
-                    disabled={uploading === appointment._id}
-                    style={({ pressed }) => [
-                      styles.uploadButton,
-                      { opacity: pressed ? 0.8 : 1 },
-                      uploading === appointment._id && styles.uploadButtonDisabled,
-                    ]}
-                  >
-                    {uploading === appointment._id ? (
-                      <>
-                        <ActivityIndicator size="small" color="#ffffff" />
-                        <Text style={styles.uploadButtonText}>Uploading...</Text>
-                      </>
-                    ) : (
-                      <>
-                        <Upload size={18} color="#ffffff" />
-                        <Text style={styles.uploadButtonText}>Select & Upload</Text>
-                      </>
-                    )}
-                  </Pressable>
+              {!appointment.prescriptionUploaded ? (
+                <View style={s.actionsColumn}>
+                  {uploading === appointment._id ? (
+                    <View style={local.uploadingRow}>
+                      <ActivityIndicator size="small" color="#1d4ed8" />
+                      <Text style={local.uploadingText}>Uploading...</Text>
+                    </View>
+                  ) : (
+                    <DoctorPrimaryButton
+                      label="Select & upload file"
+                      variant="success"
+                      onPress={() => handlePickFile(appointment._id)}
+                    />
+                  )}
                 </View>
+              ) : (
+                <Text style={[s.listCardMeta, { marginTop: 8, color: '#16a34a' }]}>
+                  Prescription uploaded
+                </Text>
               )}
             </Card>
           ))
         )}
-
-        <View style={styles.spacer} />
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  headerContent: {
-    marginTop: 20,
-    flexDirection: 'row',
+const local = StyleSheet.create({
+  center: {
     alignItems: 'center',
+    paddingVertical: 40,
     gap: 12,
-  },
-  backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: '#ffffff' },
-  headerSubtitle: { fontSize: 14, color: '#ffffff', opacity: 0.9 },
-  body: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-  },
-  centerContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 300,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6b7280',
-    fontWeight: '500',
   },
   emptyCard: {
     padding: 32,
     borderRadius: 20,
     alignItems: 'center',
-    marginVertical: 40,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#111827',
     marginTop: 12,
-    marginBottom: 4,
   },
   emptyText: {
     fontSize: 14,
     color: '#6b7280',
     textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 20,
   },
-  appointmentCard: {
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-  },
-  appointmentHeader: {
+  cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    gap: 12,
   },
-  appointmentInfo: {
-    flex: 1,
-  },
-  patientName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  appointmentTime: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginBottom: 8,
-  },
-  statusBadge: {
-    backgroundColor: '#dbeafe',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  badge: {
     alignSelf: 'flex-start',
+    backgroundColor: '#dbeafe',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 8,
   },
-  statusText: {
+  badgeText: {
     fontSize: 12,
+    fontWeight: '700',
     color: '#1e40af',
-    fontWeight: '500',
+    textTransform: 'capitalize',
   },
-  uploadSection: {
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    paddingTop: 12,
-  },
-  uploadButton: {
-    backgroundColor: '#22c55e',
-    borderRadius: 12,
-    paddingVertical: 12,
+  uploadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
+    minHeight: 48,
   },
-  uploadButtonDisabled: {
-    backgroundColor: '#86efac',
-  },
-  uploadButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  spacer: {
-    height: 20,
+  uploadingText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#374151',
   },
 });

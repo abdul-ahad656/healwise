@@ -1,163 +1,127 @@
-import React from 'react';
-import { StyleSheet, View, Text, ScrollView, SafeAreaView, Pressable } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useMemo } from 'react';
+import { StyleSheet, View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, History, LogOut } from 'lucide-react-native';
+import { History, LogOut } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
+import { DoctorScreenHeader } from '@/components/doctor/DoctorScreenHeader';
+import { doctorScreenStyles as s } from '@/styles/doctorScreen';
+import AuthStore from '@/services/authStore';
 
 export default function DoctorProfileScreen() {
   const router = useRouter();
+  const user = AuthStore.getUser();
+  const name = useMemo(() => user?.name || 'Doctor', [user]);
+  const email = useMemo(() => user?.email || '', [user]);
+
+  const handleLogout = () => {
+    AuthStore.clear();
+    router.replace('/(auth)/login');
+  };
 
   return (
-    <View style={styles.container}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f9fafb' }]} />
+    <View style={s.container}>
+      <View style={[StyleSheet.absoluteFill, s.pageBg]} />
 
-      <LinearGradient
-        colors={['#1d4ed8', '#22c55e']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView>
-          <View style={styles.headerContent}>
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [
-                styles.backButton,
-                { opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <ArrowLeft size={20} color="#ffffff" />
-            </Pressable>
-            <View>
-              <Text style={styles.headerTitle}>Profile</Text>
-              <Text style={styles.headerSubtitle}>History and account actions</Text>
-            </View>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+      <DoctorScreenHeader
+        title="Profile"
+        subtitle="Account and quick links"
+      />
 
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Card style={styles.card}>
+        <Text style={styles.name}>{name}</Text>
+        {email ? <Text style={styles.email}>{email}</Text> : null}
+
+        <Card style={styles.menuCard}>
           <Pressable
             onPress={() => router.push('/(doctor)/history')}
-            style={({ pressed }) => [
-              styles.rowItem,
-              { opacity: pressed ? 0.85 : 1 },
-            ]}
+            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.85 : 1 }]}
           >
             <View style={styles.iconCircle}>
-              <History size={18} color="#111827" />
+              <History size={20} color="#1d4ed8" />
             </View>
             <View style={styles.rowText}>
               <Text style={styles.rowTitle}>Appointment history</Text>
-              <Text style={styles.rowSubtitle}>View and manage all past appointments</Text>
+              <Text style={styles.rowSubtitle}>
+                View Appointment History
+              </Text>
             </View>
           </Pressable>
         </Card>
 
-        <Card style={styles.card}>
-          <Pressable
-            onPress={() => router.replace('/(auth)/login')}
-            style={({ pressed }) => [
-              styles.rowItem,
-              { opacity: pressed ? 0.85 : 1 },
-            ]}
-          >
-            <View style={[styles.iconCircle, { backgroundColor: '#fef2f2' }]}>
-              <LogOut size={18} color="#b91c1c" />
-            </View>
-            <View style={styles.rowText}>
-              <Text style={[styles.rowTitle, { color: '#b91c1c' }]}>Logout</Text>
-              <Text style={styles.rowSubtitle}>Sign out from your doctor account</Text>
-            </View>
-          </Pressable>
-        </Card>
+        <Pressable onPress={handleLogout} style={styles.logoutBtn}>
+          <LogOut size={18} color="#b91c1c" />
+          <Text style={styles.logoutText}>Logout</Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  name: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 4,
   },
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+  email: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 20,
   },
-  headerContent: {
-    marginTop: 20,
+  menuCard: {
+    padding: 4,
+    borderRadius: 18,
+    marginBottom: 14,
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 14,
     gap: 12,
   },
-  backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#ffffff',
-    opacity: 0.9,
-  },
-  scroll: {
-    flex: 1,
-    marginTop: -16,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 32,
-  },
-  card: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 18,
-    marginTop: 12,
-  },
-  rowItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-  },
   iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#eff6ff',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#dbeafe',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   rowText: {
-    marginLeft: 10,
     flex: 1,
-  },
+   },
   rowTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#111827',
   },
   rowSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6b7280',
-    marginTop: 2,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+    backgroundColor: '#fee2e2',
+    borderWidth: 2,
+    borderColor: '#fecaca',
+    height: 50,
+    borderRadius: 14,
+  },
+  logoutText: {
+    color: '#b91c1c',
+    fontSize: 15,
+    fontWeight: '800',
   },
 });
-
