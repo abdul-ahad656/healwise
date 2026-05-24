@@ -9,9 +9,10 @@ type Props = {
   title: string;
   subtitle?: string;
   onBack?: () => void;
+  rightElement?: React.ReactNode;
 };
 
-export function AdminScreenHeader({ title, subtitle, onBack }: Props) {
+export function AdminScreenHeader({ title, subtitle, onBack, rightElement }: Props) {
   return (
     <LinearGradient
       colors={['#0f766e', '#22c55e']}
@@ -40,6 +41,7 @@ export function AdminScreenHeader({ title, subtitle, onBack }: Props) {
               </Text>
             ) : null}
           </View>
+          {rightElement ? <View style={s.rightSlot}>{rightElement}</View> : null}
         </View>
       </SafeAreaView>
     </LinearGradient>

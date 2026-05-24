@@ -1,66 +1,103 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   Pressable,
+  TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
   Image,
   TextInput,
+  RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ArrowLeft, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { CheckCircle, AlertCircle, RefreshCw } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { formatPaymentAmount } from '@/services/paymentService';
+import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
+import { adminScreenStyles as s } from '@/styles/adminScreen';
+import { getPaymentAmountPkr } from '@/services/paymentService';
 import { API_BASE_URL } from '@/services/config';
 import AuthStore from '@/services/authStore';
 
 interface PendingPayment {
   _id: string;
-  payment_id: string;
-  userId: string;
   amount: number;
+  currency?: string;
   status: string;
   easypaisa_proof_url?: string;
-  proof_submitted_at: string;
+  easypaisa_transaction_id?: string;
+  proof_submitted_at?: string;
   createdAt: string;
   doctor_name?: string;
   appointment_date?: string;
   appointment_time?: string;
+  fee_pkr?: number;
+  metadata?: {
+    doctorName?: string;
+    appointmentDate?: string;
+    appointmentTime?: string;
+    feePkr?: number;
+  };
+}
+
+type BusyAction = 'confirm' | 'reject';
+
+function normalizePayment(raw: Record<string, unknown>): PendingPayment {
+  const meta = (raw.metadata as PendingPayment['metadata']) || {};
+  return {
+    _id: String(raw._id),
+    amount: Number(raw.amount) || 0,
+    currency: raw.currency as string | undefined,
+    status: String(raw.status || 'pending_review'),
+    easypaisa_proof_url: raw.easypaisa_proof_url as string | undefined,
+    easypaisa_transaction_id: raw.easypaisa_transaction_id as string | undefined,
+    proof_submitted_at: raw.proof_submitted_at as string | undefined,
+    createdAt: String(raw.createdAt || ''),
+    doctor_name: (raw.doctor_name as string) || meta.doctorName,
+    appointment_date: (raw.appointment_date as string) || meta.appointmentDate,
+    appointment_time: (raw.appointment_time as string) || meta.appointmentTime,
+    fee_pkr:
+      (raw.fee_pkr as number) ||
+      meta.feePkr ||
+      (raw.doctor_consultation_price as number),
+    metadata: meta,
+  };
+}
+
+function formatPkr(payment: PendingPayment): string {
+  const pkr = getPaymentAmountPkr(
+    payment.amount,
+    payment.currency,
+    payment.fee_pkr
+  );
+  return `PKR ${pkr}`;
 }
 
 export default function AdminPaymentsScreen() {
-  const router = useRouter();
   const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [confirming, setConfirming] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notes, setNotes] = useState<{ [key: string]: string }>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    fetchPendingPayments();
-  }, []);
-
-  const fetchPendingPayments = async () => {
+  const fetchPendingPayments = useCallback(async (isRefresh = false) => {
     try {
       setError(null);
       const token = AuthStore.getToken();
 
       if (!token) {
         setError('Not authenticated');
-        setLoading(false);
+        setPendingPayments([]);
         return;
       }
 
       const response = await fetch(`${API_BASE_URL}/payments/admin/pending-easypaisa`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -72,26 +109,47 @@ export default function AdminPaymentsScreen() {
         return;
       }
 
-      // Extract payments from response
-      const payments = data.payments || [];
+      const payments = (data.payments || []).map((p: Record<string, unknown>) =>
+        normalizePayment(p)
+      );
       setPendingPayments(payments);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch pending payments');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch pending payments';
+      setError(message);
       setPendingPayments([]);
     } finally {
       setLoading(false);
+      if (isRefresh) setRefreshing(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchPendingPayments();
+  }, [fetchPendingPayments]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchPendingPayments(true);
+  };
+
+  const removePaymentFromList = (paymentId: string) => {
+    setPendingPayments((prev) => prev.filter((p) => p._id !== paymentId));
+    setNotes((prev) => {
+      const next = { ...prev };
+      delete next[paymentId];
+      return next;
+    });
   };
 
   const handleConfirmPayment = async (paymentId: string) => {
-    setConfirming(paymentId);
+    setBusyId(paymentId);
+    setBusyAction('confirm');
     setError(null);
 
     try {
       const token = AuthStore.getToken();
       if (!token) {
         Alert.alert('Error', 'Not authenticated');
-        setConfirming(null);
         return;
       }
 
@@ -99,7 +157,7 @@ export default function AdminPaymentsScreen() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           payment_id: paymentId,
@@ -111,435 +169,457 @@ export default function AdminPaymentsScreen() {
 
       if (!response.ok) {
         Alert.alert('Error', data.error || 'Failed to confirm payment');
-        setConfirming(null);
         return;
       }
 
-      Alert.alert('Success', 'Payment confirmed! Appointment created.');
-      setPendingPayments(pendingPayments.filter(p => p._id !== paymentId));
-      setNotes({ ...notes, [paymentId]: '' });
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to confirm payment');
+      Alert.alert('Success', 'Payment confirmed. Appointment is now active.');
+      removePaymentFromList(paymentId);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to confirm payment';
+      Alert.alert('Error', message);
     } finally {
-      setConfirming(null);
+      setBusyId(null);
+      setBusyAction(null);
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <LinearGradient
-          colors={['#a855f7', '#ec4899']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.header}
-        >
-          <SafeAreaView>
-            <View style={styles.headerContent}>
-              <Pressable
-                onPress={() => router.back()}
-                style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-              >
-                <ArrowLeft size={24} color="white" />
-              </Pressable>
-              <Text style={styles.headerTitle}>Pending Payments</Text>
-            </View>
-          </SafeAreaView>
-        </LinearGradient>
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color="#a855f7" />
-          <Text style={styles.loadingText}>Loading payments...</Text>
-        </View>
-      </View>
+  const handleRejectPayment = async (paymentId: string) => {
+    setBusyId(paymentId);
+    setBusyAction('reject');
+    setError(null);
+
+    try {
+      const token = AuthStore.getToken();
+      if (!token) {
+        Alert.alert('Error', 'Not authenticated');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/payments/admin/reject-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          payment_id: paymentId,
+          admin_notes: notes[paymentId] || '',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        Alert.alert('Error', data.error || 'Failed to reject payment');
+        return;
+      }
+
+      Alert.alert('Rejected', 'Payment rejected. No appointment was created.');
+      removePaymentFromList(paymentId);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to reject payment';
+      Alert.alert('Error', message);
+    } finally {
+      setBusyId(null);
+      setBusyAction(null);
+    }
+  };
+
+  const promptReject = (paymentId: string) => {
+    Alert.alert(
+      'Reject payment',
+      'Reject this Easypaisa payment? The patient will need to pay again to book.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: () => handleRejectPayment(paymentId),
+        },
+      ]
     );
-  }
+  };
+
+  const refreshButton = (
+    <Pressable
+      onPress={onRefresh}
+      disabled={loading || refreshing}
+      style={({ pressed }) => [local.iconButton, { opacity: pressed ? 0.7 : 1 }]}
+      accessibilityLabel="Refresh payments"
+    >
+      <RefreshCw size={20} color="#ffffff" />
+    </Pressable>
+  );
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#a855f7', '#ec4899']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView>
-          <View style={styles.headerContent}>
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-            >
-              <ArrowLeft size={24} color="white" />
-            </Pressable>
-            <View style={styles.headerTitle}>
-              <Text style={styles.titleText}>Pending Payments</Text>
-              <Text style={styles.subtitleText}>
-                {pendingPayments.length} payment(s) awaiting confirmation
-              </Text>
-            </View>
-            <Pressable
-              onPress={fetchPendingPayments}
-              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-            >
-              <RefreshCw size={24} color="white" />
-            </Pressable>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+    <View style={s.container}>
+      <View style={[StyleSheet.absoluteFill, s.pageBg]} />
 
-      {error && (
-        <Card style={styles.errorCard}>
-          <View style={styles.errorContent}>
-            <AlertCircle size={20} color="#dc2626" />
-            <Text style={styles.errorText}>{error}</Text>
+      <AdminScreenHeader
+        title="Payment approval"
+        subtitle={
+          loading
+            ? 'Loading…'
+            : `${pendingPayments.length} Easypaisa payment(s) awaiting review`
+        }
+        rightElement={refreshButton}
+      />
+
+      {error ? (
+        <Card style={local.errorCard}>
+          <View style={local.errorRow}>
+            <AlertCircle size={20} color="#b91c1c" />
+            <Text style={s.errorText}>{error}</Text>
           </View>
         </Card>
-      )}
+      ) : null}
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {pendingPayments.length === 0 ? (
-          <View style={styles.emptyState}>
-            <CheckCircle size={48} color="#10b981" />
-            <Text style={styles.emptyTitle}>All caught up!</Text>
-            <Text style={styles.emptyText}>No pending payments to review</Text>
-          </View>
-        ) : (
-          pendingPayments.map((payment) => (
-            <Card key={payment._id} style={styles.paymentCard}>
-              {/* Payment Status Header */}
-              <View style={styles.cardHeader}>
-                <View style={styles.statusBadge}>
-                  <AlertCircle size={16} color="#dc2626" />
-                  <Text style={styles.statusText}>Pending Review</Text>
-                </View>
-                <Text style={styles.amountBadge}>
-                  {formatPaymentAmount(payment.amount, 'usd')}
-                </Text>
-              </View>
-
-              {/* Appointment Details */}
-              <View style={styles.detailsSection}>
-                <Text style={styles.sectionLabel}>Appointment Details</Text>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailKey}>Doctor</Text>
-                  <Text style={styles.detailValue}>{payment.doctor_name || 'N/A'}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailKey}>Date & Time</Text>
-                  <Text style={styles.detailValue}>
-                    {payment.appointment_date || 'N/A'} {payment.appointment_time || ''}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Proof of Payment */}
-              {payment.easypaisa_proof_url && (
-                <View style={styles.proofSection}>
-                  <Text style={styles.sectionLabel}>Proof of Payment</Text>
-                  <Image
-                    source={{ uri: payment.easypaisa_proof_url }}
-                    style={styles.proofImage}
-                  />
-                  <Pressable
-                    onPress={() => {
-                      Alert.alert('Proof URL', payment.easypaisa_proof_url || 'No URL available');
-                    }}
-                    style={styles.viewProofButton}
-                  >
-                    <Text style={styles.viewProofText}>View Full Size</Text>
-                  </Pressable>
-                </View>
-              )}
-
-              {/* Submission Timeline */}
-              <View style={styles.timelineSection}>
-                <Text style={styles.sectionLabel}>Timeline</Text>
-                <View style={styles.timelineItem}>
-                  <Text style={styles.timelineLabel}>Created</Text>
-                  <Text style={styles.timelineTime}>
-                    {new Date(payment.createdAt).toLocaleString()}
-                  </Text>
-                </View>
-                <View style={styles.timelineItem}>
-                  <Text style={styles.timelineLabel}>Proof Submitted</Text>
-                  <Text style={styles.timelineTime}>
-                    {new Date(payment.proof_submitted_at).toLocaleString()}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Admin Notes */}
-              <View style={styles.notesSection}>
-                <Text style={styles.sectionLabel}>Admin Notes (Optional)</Text>
-                <TextInput
-                  style={styles.notesInput}
-                  placeholder="Add verification notes..."
-                  multiline
-                  numberOfLines={3}
-                  value={notes[payment._id] || ''}
-                  onChangeText={(text) =>
-                    setNotes({ ...notes, [payment._id]: text })
-                  }
-                  editable={confirming !== payment._id}
-                />
-              </View>
-
-              {/* Action Buttons */}
-              <View style={styles.actionButtons}>
-                <Pressable
-                  onPress={() =>
-                    Alert.alert('Reject', 'Reject this payment?', [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Reject',
-                        onPress: () => {
-                          Alert.alert('Info', 'Reject functionality coming soon');
-                        },
-                        style: 'destructive',
-                      },
-                    ])
-                  }
-                  style={styles.rejectButton}
-                  disabled={confirming !== null}
-                >
-                  <Text style={styles.rejectButtonText}>Reject</Text>
-                </Pressable>
-
-                <Button
-                  title={
-                    confirming === payment._id ? 'Confirming...' : 'Confirm Payment'
-                  }
-                  onPress={() => handleConfirmPayment(payment._id)}
-                  disabled={confirming !== null}
-                  style={styles.confirmButton}
-                />
-              </View>
+      {loading ? (
+        <View style={local.center}>
+          <ActivityIndicator size="large" color="#047857" />
+          <Text style={s.infoText}>Loading payments…</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={s.scroll}
+          contentContainerStyle={[s.scrollContent, local.scrollContent]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {pendingPayments.length === 0 ? (
+            <Card style={local.emptyCard}>
+              <CheckCircle size={48} color="#16a34a" />
+              <Text style={local.emptyTitle}>All caught up</Text>
+              <Text style={local.emptyText}>No pending Easypaisa payments to review.</Text>
             </Card>
-          ))
-        )}
-      </ScrollView>
+          ) : (
+            pendingPayments.map((payment) => {
+              const isBusy = busyId === payment._id;
+              const isCardLocked = busyId !== null;
+
+              return (
+                <View key={payment._id} style={local.paymentCard}>
+                  <View style={local.cardHeader}>
+                    <View style={local.statusBadge}>
+                      <AlertCircle size={16} color="#b45309" />
+                      <Text style={local.statusText}>Pending review</Text>
+                    </View>
+                    <Text style={local.amountText}>{formatPkr(payment)}</Text>
+                  </View>
+
+                  <View style={local.section}>
+                    <Text style={local.sectionLabel}>Appointment</Text>
+                    <View style={local.detailRow}>
+                      <Text style={local.detailKey}>Doctor</Text>
+                      <Text style={local.detailValue}>
+                        {payment.doctor_name || '—'}
+                      </Text>
+                    </View>
+                    <View style={local.detailRow}>
+                      <Text style={local.detailKey}>Date & time</Text>
+                      <Text style={local.detailValue}>
+                        {payment.appointment_date || '—'}
+                        {payment.appointment_time
+                          ? ` · ${payment.appointment_time}`
+                          : ''}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {payment.easypaisa_proof_url ? (
+                    <View style={local.section}>
+                      <Text style={local.sectionLabel}>Payment proof</Text>
+                      <Image
+                        source={{ uri: payment.easypaisa_proof_url }}
+                        style={local.proofImage}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  ) : payment.easypaisa_transaction_id ? (
+                    <View style={local.section}>
+                      <Text style={local.sectionLabel}>Transaction ID</Text>
+                      <Text style={local.detailValue}>
+                        {payment.easypaisa_transaction_id}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <View style={local.section}>
+                    <Text style={local.sectionLabel}>Timeline</Text>
+                    <Text style={local.timelineText}>
+                      Created:{' '}
+                      {payment.createdAt
+                        ? new Date(payment.createdAt).toLocaleString()
+                        : '—'}
+                    </Text>
+                    {payment.proof_submitted_at ? (
+                      <Text style={local.timelineText}>
+                        Proof submitted:{' '}
+                        {new Date(payment.proof_submitted_at).toLocaleString()}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  <View style={local.section}>
+                    <Text style={local.sectionLabel}>Admin notes (optional)</Text>
+                    <TextInput
+                      style={[s.input, local.notesInput]}
+                      placeholder="Verification notes…"
+                      placeholderTextColor="#9ca3af"
+                      multiline
+                      numberOfLines={3}
+                      value={notes[payment._id] || ''}
+                      onChangeText={(text) =>
+                        setNotes((prev) => ({ ...prev, [payment._id]: text }))
+                      }
+                      editable={!isCardLocked}
+                    />
+                  </View>
+
+                  <View style={local.actionsBar}>
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => handleConfirmPayment(payment._id)}
+                      disabled={isCardLocked}
+                      style={[
+                        local.confirmBtn,
+                        isCardLocked && local.btnDisabled,
+                      ]}
+                    >
+                      {isBusy && busyAction === 'confirm' ? (
+                        <ActivityIndicator color="#047857" size="small" />
+                      ) : (
+                        <View style={local.btnInner}>
+                          <CheckCircle size={20} color="#047857" strokeWidth={2.5} />
+                          <Text style={local.confirmBtnText}>Confirm payment</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => promptReject(payment._id)}
+                      disabled={isCardLocked}
+                      style={[
+                        local.rejectBtn,
+                        isCardLocked && local.btnDisabled,
+                      ]}
+                    >
+                      {isBusy && busyAction === 'reject' ? (
+                        <ActivityIndicator color="#dc2626" size="small" />
+                      ) : (
+                        <View style={local.btnInner}>
+                          <AlertCircle size={20} color="#dc2626" strokeWidth={2.5} />
+                          <Text style={local.rejectBtnText}>Reject</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  header: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+const local = StyleSheet.create({
+  scrollContent: {
+    paddingBottom: 120,
   },
-  headerContent: {
-    flexDirection: 'row',
+  center: {
+    flex: 1,
     alignItems: 'center',
-    gap: 12,
-  },
-  headerTitle: {
-    flex: 1,
-    gap: 2,
-  },
-  titleText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  subtitleText: {
-    fontSize: 12,
-    color: '#f3e8ff',
-  },
-  centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 16, fontSize: 14, color: '#6b7280' },
-  scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingVertical: 16, gap: 12 },
-
-  // Error Card
-  errorCard: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    backgroundColor: '#fee2e2',
-    borderLeftWidth: 4,
-    borderLeftColor: '#dc2626',
-  },
-  errorContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  errorText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#b91c1c',
-    fontWeight: '500',
-  },
-
-  // Empty State
-  emptyState: {
-    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
+    padding: 24,
     gap: 12,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorCard: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  emptyCard: {
+    padding: 32,
+    borderRadius: 20,
+    alignItems: 'center',
+    gap: 10,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#1f2937',
+    fontWeight: '800',
+    color: '#111827',
   },
   emptyText: {
     fontSize: 14,
     color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
   },
-
-  // Payment Card
   paymentCard: {
-    gap: 16,
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
     borderLeftWidth: 4,
     borderLeftColor: '#f59e0b',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 16,
+  },
+  actionsBar: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 2,
+    borderTopColor: '#9ca3af',
+    width: '100%',
+  },
+  btnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  confirmBtn: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#047857',
+    backgroundColor: '#ecfdf5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+  },
+  confirmBtnText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#047857',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#fef2f2',
+    backgroundColor: '#fffbeb',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: 8,
+    flexShrink: 1,
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#b91c1c',
-  },
-  amountBadge: {
-    fontSize: 16,
     fontWeight: '700',
-    color: '#a855f7',
+    color: '#b45309',
   },
-
-  // Details Section
-  detailsSection: {
+  amountText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#047857',
+  },
+  section: {
     gap: 8,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingTop: 12,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
   },
   sectionLabel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#6b7280',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
   },
   detailKey: {
     fontSize: 13,
     color: '#6b7280',
+    flex: 1,
   },
   detailValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1f2937',
-  },
-
-  // Proof Section
-  proofSection: {
-    gap: 8,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    color: '#111827',
+    flex: 1.2,
+    textAlign: 'right',
   },
   proofImage: {
     width: '100%',
     height: 200,
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: '#f3f4f6',
   },
-  viewProofButton: {
-    backgroundColor: '#f3e8ff',
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  viewProofText: {
+  timelineText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#a855f7',
-  },
-
-  // Timeline
-  timelineSection: {
-    gap: 8,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  timelineItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  timelineLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  timelineTime: {
-    fontSize: 12,
-    color: '#1f2937',
-    fontWeight: '500',
-  },
-
-  // Notes Section
-  notesSection: {
-    gap: 6,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    color: '#374151',
+    lineHeight: 18,
   },
   notesInput: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 12,
-    color: '#1f2937',
+    minHeight: 88,
     textAlignVertical: 'top',
   },
-
-  // Action Buttons
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  rejectButton: {
+  rejectBtn: {
     flex: 1,
-    borderWidth: 1,
+    minHeight: 52,
+    borderRadius: 12,
+    borderWidth: 2,
     borderColor: '#f87171',
-    paddingVertical: 10,
-    borderRadius: 6,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    elevation: 2,
   },
-  rejectButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
+  rejectBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
     color: '#dc2626',
   },
-  confirmButton: {
-    flex: 1,
-    backgroundColor: '#10b981',
-    paddingVertical: 10,
-    borderRadius: 6,
-    alignItems: 'center',
+  btnDisabled: {
+    opacity: 0.55,
   },
 });

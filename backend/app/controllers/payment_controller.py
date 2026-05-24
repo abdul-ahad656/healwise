@@ -13,6 +13,7 @@ from app.models.payment_model import (
     check_active_payment_for_appointment,
     submit_payment_proof,
     update_payment_to_paid,
+    update_payment_to_rejected,
     get_pending_easypaisa_payments,
     find_payment_by_id,
     payment_has_booked_appointment,
@@ -493,6 +494,69 @@ def admin_confirm_payment_handler():
         return jsonify({"error": f"Internal error: {str(e)}"}), 500
 
 
+def admin_reject_payment_handler():
+    """Admin rejects an Easypaisa payment under review."""
+    try:
+        claims = get_jwt()
+        if claims.get("role") != "admin":
+            return jsonify({"error": "Only admins can reject payments"}), 403
+
+        data = request.json or {}
+        payment_id = data.get("payment_id")
+        admin_notes = data.get("admin_notes")
+
+        if not payment_id:
+            return jsonify({"error": "Missing required field: payment_id"}), 400
+
+        try:
+            payment_id_obj = ObjectId(payment_id)
+            payment = find_payment_by_id(payment_id_obj)
+        except Exception:
+            return jsonify({"error": "Invalid payment ID"}), 400
+
+        if not payment:
+            return jsonify({"error": "Payment not found"}), 404
+
+        if payment.get("status") != "pending_review":
+            return jsonify({
+                "error": (
+                    f"Only payments in 'pending_review' can be rejected. "
+                    f"Current status: {payment.get('status')}"
+                )
+            }), 400
+
+        if payment.get("payment_method") != "easypaisa":
+            return jsonify({"error": "Only Easypaisa payments can be rejected here"}), 400
+
+        try:
+            update_payment_to_rejected(payment_id_obj, admin_notes)
+        except Exception as e:
+            return jsonify({"error": f"Failed to reject payment: {str(e)}"}), 500
+
+        return jsonify({
+            "message": "Payment rejected. No appointment was created.",
+            "payment_id": payment_id,
+            "status": "rejected",
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Internal error: {str(e)}"}), 500
+
+
+def _enrich_pending_payment(payment):
+    """Add display fields for admin UI."""
+    meta = payment.get("metadata") or {}
+    payment["doctor_name"] = meta.get("doctorName") or payment.get("doctor_name")
+    payment["appointment_date"] = meta.get("appointmentDate") or payment.get("appointment_date")
+    payment["appointment_time"] = meta.get("appointmentTime") or payment.get("appointment_time")
+    payment["fee_pkr"] = (
+        meta.get("feePkr")
+        or payment.get("doctor_consultation_price")
+        or payment.get("fee_pkr")
+    )
+    return payment
+
+
 def handle_webhook():
     """
     Handle Stripe webhook events.
@@ -746,6 +810,7 @@ def get_pending_easypaisa_for_admin():
             return jsonify({"error": "Only admins can view pending payments"}), 403
 
         payments = get_pending_easypaisa_payments()
+        payments = [_enrich_pending_payment(p) for p in payments]
 
         return jsonify({
             "total": len(payments),

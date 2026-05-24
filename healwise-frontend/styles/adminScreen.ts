@@ -114,6 +114,9 @@ export const adminHeaderStyles = StyleSheet.create({
     flex: 1,
     paddingRight: 8,
   },
+  rightSlot: {
+    marginLeft: 4,
+  },
   title: {
     fontSize: 20,
     fontWeight: '800',
