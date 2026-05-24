@@ -24,11 +24,18 @@ def upload_prescription(appointment_id):
     if not appointment:
         return jsonify({"error": "Appointment not found"}), 404
 
-    if appointment.get("doctorId") != doctor_id:
+    if str(appointment.get("doctorId")) != str(doctor_id):
         return jsonify({"error": "You can only upload prescriptions for your own appointments"}), 403
 
-    if appointment.get("status") not in ["accepted", "completed"]:
-        return jsonify({"error": "Can only upload prescriptions for accepted or completed appointments"}), 400
+    uploadable_statuses = {"accepted", "confirmed", "in_progress", "completed"}
+    if appointment.get("status") not in uploadable_statuses:
+        return jsonify({
+            "error": "Can only upload prescriptions after the consultation has started or finished"
+        }), 400
+
+    existing = mongo.db.prescriptions.find_one({"appointmentId": appointment_id})
+    if existing:
+        return jsonify({"error": "A prescription already exists for this appointment"}), 409
 
     if "prescription" not in request.files:
         return jsonify({"error": "No prescription file provided"}), 400
