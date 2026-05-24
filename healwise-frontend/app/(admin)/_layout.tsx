@@ -3,7 +3,13 @@ import { FontAwesome } from '@expo/vector-icons';
 
 export default function AdminLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#047857',
+        tabBarInactiveTintColor: '#9ca3af',
+      }}
+    >
       <Tabs.Screen
         name="dashboard"
         options={{
@@ -23,10 +29,11 @@ export default function AdminLayout() {
         }}
       />
 
+      <Tabs.Screen name="payments" options={{ href: null }} />
+      <Tabs.Screen name="analytics" options={{ href: null }} />
       <Tabs.Screen name="manage-doctors" options={{ href: null }} />
       <Tabs.Screen name="manage-health-tips" options={{ href: null }} />
       <Tabs.Screen name="manage-medicine" options={{ href: null }} />
-      <Tabs.Screen name="analytics" options={{ href: null }} />
     </Tabs>
   );
 }

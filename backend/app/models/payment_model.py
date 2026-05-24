@@ -212,6 +212,27 @@ def get_pending_easypaisa_payments(limit=50):
         raise Exception(f"Failed to retrieve pending payments: {str(e)}")
 
 
+def update_payment_to_rejected(payment_id, admin_notes=None):
+    """Mark Easypaisa payment as rejected after admin review."""
+    try:
+        update_dict = {
+            "status": "rejected",
+            "rejected_at": datetime.utcnow(),
+            "updatedAt": datetime.utcnow(),
+        }
+        if admin_notes:
+            update_dict["admin_notes"] = admin_notes
+        update_dict["admin_rejected_at"] = datetime.utcnow()
+
+        result = mongo.db.payments.update_one(
+            {"_id": ObjectId(payment_id)},
+            {"$set": update_dict},
+        )
+        return result.modified_count > 0
+    except (PyMongoError, Exception) as e:
+        raise Exception(f"Failed to reject payment: {str(e)}")
+
+
 def find_payment_by_stripe_intent(stripe_intent_id):
     """Find payment by Stripe PaymentIntent ID (for webhook)."""
     try:

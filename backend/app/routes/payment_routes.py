@@ -4,6 +4,7 @@ from app.controllers.payment_controller import (
     create_payment_handler,
     submit_proof_handler,
     admin_confirm_payment_handler,
+    admin_reject_payment_handler,
     handle_webhook,
     get_payment_history,
     refund_payment_handler,
@@ -38,6 +39,13 @@ def submit_proof():
 def admin_confirm():
     """Admin endpoint to confirm Easypaisa payments."""
     return admin_confirm_payment_handler()
+
+
+@payment_bp.post("/admin/reject-payment")
+@jwt_required()
+def admin_reject():
+    """Admin endpoint to reject Easypaisa payments."""
+    return admin_reject_payment_handler()
 
 
 @payment_bp.get("/admin/pending-easypaisa")

@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { UserCog, Activity, FileText, Pill } from 'lucide-react-native';
+import { UserCog, FileText, Pill, CreditCard } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
 import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
 import { adminScreenStyles as s } from '@/styles/adminScreen';
@@ -23,6 +23,21 @@ export default function AdminDashboard() {
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        <Pressable
+          onPress={() => router.push('/(admin)/payments')}
+          style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, marginBottom: 14 }]}
+        >
+          <Card style={dash.card}>
+            <View style={dash.cardIcon}>
+              <CreditCard size={22} color="#0f172a" />
+            </View>
+            <Text style={dash.cardTitle}>Payment approval</Text>
+            <Text style={dash.cardSubtitle}>
+              Review and confirm Easypaisa payments
+            </Text>
+          </Card>
+        </Pressable>
+
         <Pressable
           onPress={() => router.push('/(admin)/manage-doctors')}
           style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, marginBottom: 14 }]}
@@ -68,20 +83,6 @@ export default function AdminDashboard() {
           </Card>
         </Pressable>
 
-        <Pressable
-          onPress={() => router.push('/(admin)/analytics')}
-          style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-        >
-          <Card style={dash.card}>
-            <View style={dash.cardIcon}>
-              <Activity size={22} color="#0f172a" />
-            </View>
-            <Text style={dash.cardTitle}>Analytics</Text>
-            <Text style={dash.cardSubtitle}>
-              View system usage and key metrics
-            </Text>
-          </Card>
-        </Pressable>
       </ScrollView>
     </View>
   );
