@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FileText, CheckCircle } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Card } from '@/components/ui/card';
@@ -20,33 +20,48 @@ import {
   Appointment,
 } from '@/services/doctorPanelService';
 
-interface AugmentedAppointment extends Appointment {
-  prescriptionUploaded?: boolean;
-}
+const PRESCRIPTION_ELIGIBLE_STATUSES: Appointment['status'][] = [
+  'in_progress',
+  'completed',
+];
 
 export default function UploadPrescriptionScreen() {
   const router = useRouter();
-  const [appointments, setAppointments] = useState<AugmentedAppointment[]>([]);
+  const { appointmentId: focusAppointmentId } = useLocalSearchParams<{
+    appointmentId?: string;
+  }>();
+
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAppointments();
-  }, []);
-
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async () => {
     try {
       const data = await getDoctorAppointments();
-      setAppointments(
-        data.filter((a) => a.status === 'completed' || a.status === 'accepted')
-      );
+      const eligible = data
+        .filter((a) => PRESCRIPTION_ELIGIBLE_STATUSES.includes(a.status))
+        .sort((a, b) => {
+          if (focusAppointmentId) {
+            if (a._id === focusAppointmentId) return -1;
+            if (b._id === focusAppointmentId) return 1;
+          }
+          const dateCompare = b.appointmentDate.localeCompare(a.appointmentDate);
+          if (dateCompare !== 0) return dateCompare;
+          return b.appointmentTime.localeCompare(a.appointmentTime);
+        });
+
+      setAppointments(eligible);
     } catch (error) {
       Alert.alert('Error', 'Failed to load appointments');
       console.error(error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [focusAppointmentId]);
+
+  useEffect(() => {
+    loadAppointments();
+  }, [loadAppointments]);
 
   const handlePickFile = async (appointmentId: string) => {
     try {
@@ -87,7 +102,7 @@ export default function UploadPrescriptionScreen() {
       Alert.alert('Success', 'Prescription uploaded successfully');
       setAppointments((prev) =>
         prev.map((a) =>
-          a._id === appointmentId ? { ...a, prescriptionUploaded: true } : a
+          a._id === appointmentId ? { ...a, hasPrescription: true } : a
         )
       );
     } catch (error: any) {
@@ -104,7 +119,7 @@ export default function UploadPrescriptionScreen() {
 
       <DoctorScreenHeader
         title="Upload Prescriptions"
-        subtitle="Share prescriptions with your patients"
+        subtitle="Upload Rx files after completing a consultation"
         onBack={() => router.back()}
       />
 
@@ -121,53 +136,67 @@ export default function UploadPrescriptionScreen() {
         ) : appointments.length === 0 ? (
           <Card style={local.emptyCard}>
             <FileText size={48} color="#9ca3af" />
-            <Text style={local.emptyTitle}>No appointments</Text>
+            <Text style={local.emptyTitle}>No consultations ready</Text>
             <Text style={local.emptyText}>
-              You have no completed or accepted appointments yet.
+              After you finish a video consultation, the appointment will appear here
+              so you can upload a prescription for that patient.
             </Text>
           </Card>
         ) : (
-          appointments.map((appointment) => (
-            <Card key={appointment._id} style={s.listCard}>
-              <View style={local.cardHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.listCardTitle}>
-                    {appointment.patientName || 'Patient'}
-                  </Text>
-                  <Text style={s.listCardMeta}>
-                    {appointment.appointmentDate} at {appointment.appointmentTime}
-                  </Text>
-                  <View style={local.badge}>
-                    <Text style={local.badgeText}>{appointment.status}</Text>
-                  </View>
-                </View>
-                {appointment.prescriptionUploaded ? (
-                  <CheckCircle size={28} color="#16a34a" />
-                ) : null}
-              </View>
+          appointments.map((appointment) => {
+            const isFocused = appointment._id === focusAppointmentId;
+            const uploaded = appointment.hasPrescription === true;
 
-              {!appointment.prescriptionUploaded ? (
-                <View style={s.actionsColumn}>
-                  {uploading === appointment._id ? (
-                    <View style={local.uploadingRow}>
-                      <ActivityIndicator size="small" color="#1d4ed8" />
-                      <Text style={local.uploadingText}>Uploading...</Text>
+            return (
+              <Card
+                key={appointment._id}
+                style={[s.listCard, isFocused && local.focusedCard]}
+              >
+                <View style={local.cardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.listCardTitle}>
+                      {appointment.patientName || 'Patient'}
+                    </Text>
+                    <Text style={s.listCardMeta}>
+                      {appointment.appointmentDate} at {appointment.appointmentTime}
+                    </Text>
+                    <View style={local.badge}>
+                      <Text style={local.badgeText}>
+                        {appointment.status.replace('_', ' ')}
+                      </Text>
                     </View>
-                  ) : (
-                    <DoctorPrimaryButton
-                      label="Select & upload file"
-                      variant="success"
-                      onPress={() => handlePickFile(appointment._id)}
-                    />
-                  )}
+                    {isFocused ? (
+                      <Text style={local.focusHint}>Just completed consultation</Text>
+                    ) : null}
+                  </View>
+                  {uploaded ? (
+                    <CheckCircle size={28} color="#16a34a" />
+                  ) : null}
                 </View>
-              ) : (
-                <Text style={[s.listCardMeta, { marginTop: 8, color: '#16a34a' }]}>
-                  Prescription uploaded
-                </Text>
-              )}
-            </Card>
-          ))
+
+                {!uploaded ? (
+                  <View style={s.actionsColumn}>
+                    {uploading === appointment._id ? (
+                      <View style={local.uploadingRow}>
+                        <ActivityIndicator size="small" color="#1d4ed8" />
+                        <Text style={local.uploadingText}>Uploading...</Text>
+                      </View>
+                    ) : (
+                      <DoctorPrimaryButton
+                        label="Select & upload file"
+                        variant="success"
+                        onPress={() => handlePickFile(appointment._id)}
+                      />
+                    )}
+                  </View>
+                ) : (
+                  <Text style={[s.listCardMeta, { marginTop: 8, color: '#16a34a' }]}>
+                    Prescription uploaded
+                  </Text>
+                )}
+              </Card>
+            );
+          })
         )}
       </ScrollView>
     </View>
@@ -197,6 +226,16 @@ const local = StyleSheet.create({
     textAlign: 'center',
     marginTop: 6,
     lineHeight: 20,
+  },
+  focusedCard: {
+    borderColor: '#86efac',
+    borderWidth: 2,
+  },
+  focusHint: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#15803d',
   },
   cardHeader: {
     flexDirection: 'row',

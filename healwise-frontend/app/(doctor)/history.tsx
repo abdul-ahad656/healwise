@@ -142,12 +142,41 @@ export default function HistoryScreen() {
                   </>
                 ) : null}
 
-                {a.status === 'accepted' ? (
+                {a.status === 'accepted' || a.status === 'confirmed' ? (
                   <DoctorPrimaryButton
                     label="Mark as completed"
                     variant="primary"
                     onPress={() => handleStatusChange(a._id, 'completed')}
                   />
+                ) : null}
+
+                {a.status === 'in_progress' ? (
+                  <DoctorPrimaryButton
+                    label="Mark as completed"
+                    variant="primary"
+                    onPress={() => handleStatusChange(a._id, 'completed')}
+                  />
+                ) : null}
+
+                {(a.status === 'in_progress' || a.status === 'completed') &&
+                !a.hasPrescription ? (
+                  <DoctorPrimaryButton
+                    label="Upload prescription"
+                    variant="success"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(doctor)/upload-prescription',
+                        params: { appointmentId: a._id },
+                      })
+                    }
+                  />
+                ) : null}
+
+                {(a.status === 'in_progress' || a.status === 'completed') &&
+                a.hasPrescription ? (
+                  <Text style={[s.listCardMeta, { color: '#16a34a' }]}>
+                    Prescription uploaded
+                  </Text>
                 ) : null}
               </View>
             </Card>

@@ -17,7 +17,6 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { useRouter } from 'expo-router';
 import { useZegoConfig } from '@/hooks/useZegoConfig';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -29,6 +28,8 @@ export interface ConsultationRoomProps {
   userID: string;
   /** Display name shown inside the call to the remote participant. */
   userName: string;
+  /** Called when the user leaves the call — parent should clear call state. */
+  onLeave?: () => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -37,9 +38,9 @@ export default function ConsultationRoom({
   appointmentId,
   userID,
   userName,
+  onLeave,
 }: ConsultationRoomProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
   const { appID, appSign, error } = useZegoConfig();
 
   useEffect(() => {
@@ -83,7 +84,7 @@ export default function ConsultationRoom({
          * Navigate back to the previous screen when the local user leaves the
          * call via the "Leave" button or the room is otherwise closed.
          */
-        onLeaveRoom: () => router.back(),
+        onLeaveRoom: () => onLeave?.(),
       });
     })();
 
@@ -94,7 +95,7 @@ export default function ConsultationRoom({
       zp?.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appID, appSign, appointmentId, userID, userName]);
+  }, [appID, appSign, appointmentId, userID, userName, onLeave]);
 
   // ── Credential error guard ─────────────────────────────────────────────────
   if (error) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,11 +12,15 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Video, PhoneOff, Calendar, Clock, User } from 'lucide-react-native';
+import { ArrowLeft, Video, Calendar, Clock, User } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
 import ConsultationRoom from '@/components/VideoCall/ConsultationRoom';
 import { getPatientAppointments, Appointment } from '@/services/doctorPanelService';
 import AuthStore from '@/services/authStore';
+import {
+  canStartTeleconsult,
+  isJoinableStatus,
+} from '@/utils/consultationTime';
 
 interface CallState {
   appointmentId: string;
@@ -63,10 +67,18 @@ export default function AppointmentsScreen() {
       Alert.alert('Error', 'Could not determine your user ID. Please log in again.');
       return;
     }
-    if (appointment.status !== 'accepted') {
-      Alert.alert('Cannot Join', 'You can only join video calls for accepted appointments.');
+
+    const window = canStartTeleconsult(
+      appointment.status,
+      appointment.appointmentDate,
+      appointment.appointmentTime
+    );
+
+    if (!window.canJoin) {
+      Alert.alert('Cannot join yet', window.message);
       return;
     }
+
     setActiveCall({
       appointmentId: appointment._id,
       userID: String(user.id),
@@ -74,9 +86,9 @@ export default function AppointmentsScreen() {
     });
   };
 
-  const endCall = () => {
+  const handleCallEnded = useCallback(() => {
     setActiveCall(null);
-  };
+  }, []);
 
   const formatDate = (dateString: string) => {
     try {
@@ -95,7 +107,10 @@ export default function AppointmentsScreen() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'accepted':
+      case 'confirmed':
         return { bg: '#dcfce7', border: '#bbf7d0', text: '#15803d' };
+      case 'in_progress':
+        return { bg: '#dbeafe', border: '#bfdbfe', text: '#1d4ed8' };
       case 'pending':
         return { bg: '#fef3c7', border: '#fde68a', text: '#b45309' };
       case 'rejected':
@@ -115,16 +130,8 @@ export default function AppointmentsScreen() {
           appointmentId={activeCall.appointmentId}
           userID={activeCall.userID}
           userName={activeCall.userName}
+          onLeave={handleCallEnded}
         />
-        <Pressable
-          onPress={endCall}
-          style={({ pressed }) => [
-            styles.leaveOverlayBtn,
-            { opacity: pressed ? 0.7 : 1 },
-          ]}
-        >
-          <PhoneOff size={18} color="#ffffff" />
-        </Pressable>
       </View>
     );
   }
@@ -195,7 +202,12 @@ export default function AppointmentsScreen() {
         ) : (
           appointments.map((appointment) => {
             const statusColor = getStatusColor(appointment.status);
-            const isAccepted = appointment.status === 'accepted';
+            const joinWindow = canStartTeleconsult(
+              appointment.status,
+              appointment.appointmentDate,
+              appointment.appointmentTime
+            );
+            const canJoin = isJoinableStatus(appointment.status) && joinWindow.canJoin;
             return (
               <Card key={appointment._id} style={styles.appointmentCard}>
                 <View style={styles.cardHeader}>
@@ -203,7 +215,7 @@ export default function AppointmentsScreen() {
                     <View style={styles.doctorNameRow}>
                       <User size={16} color="#6b7280" />
                       <Text style={styles.doctorName}>
-                        {appointment.patientName || 'Doctor'}
+                        {appointment.doctorName || 'Doctor'}
                       </Text>
                     </View>
                   </View>
@@ -250,7 +262,7 @@ export default function AppointmentsScreen() {
                   </View>
                 </View>
 
-                {isAccepted && (
+                {canJoin ? (
                   <Pressable
                     onPress={() => startCall(appointment)}
                     style={({ pressed }) => [
@@ -261,13 +273,13 @@ export default function AppointmentsScreen() {
                     <Video size={16} color="white" />
                     <Text style={styles.joinCallText}>Join Video Call</Text>
                   </Pressable>
-                )}
-
-                {!isAccepted && (
+                ) : (
                   <View style={styles.disabledBtn}>
                     <Text style={styles.disabledBtnText}>
                       {appointment.status === 'pending'
                         ? 'Waiting for doctor to accept'
+                        : isJoinableStatus(appointment.status)
+                        ? joinWindow.message
                         : 'Cannot join this appointment'}
                     </Text>
                   </View>
@@ -451,15 +463,4 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   callContainer: { flex: 1 },
-  leaveOverlayBtn: {
-    position: 'absolute',
-    top: 40,
-    left: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });

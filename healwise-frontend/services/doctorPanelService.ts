@@ -17,7 +17,15 @@ export interface Appointment {
   patientName?: string;
   appointmentDate: string;
   appointmentTime: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'completed';
+  doctorName?: string;
+  status:
+    | 'pending'
+    | 'accepted'
+    | 'confirmed'
+    | 'in_progress'
+    | 'rejected'
+    | 'completed';
+  hasPrescription?: boolean;
 }
 
 export interface SymptomHistoryItem {
@@ -119,6 +127,28 @@ export const updateAppointmentStatus = async (
   if (!response.ok) {
     throw new Error(data.error || 'Failed to update appointment');
   }
+};
+
+export const startConsultation = async (
+  appointmentId: string
+): Promise<{ message: string; appointmentId: string; status: string }> => {
+  const headers = getAuthHeaders();
+
+  const response = await fetch(
+    `${API_BASE_URL}/appointments/start-consultation/${appointmentId}`,
+    {
+      method: 'POST',
+      headers,
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Cannot start consultation yet');
+  }
+
+  return data;
 };
 
 export const getMyAvailability = async (): Promise<DoctorAvailabilityDay[]> => {

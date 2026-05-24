@@ -2,8 +2,44 @@ from flask import request, jsonify, current_app
 from flask_jwt_extended import get_jwt_identity
 from app.extensions import mongo
 from bson.objectid import ObjectId
-from datetime import datetime
+from datetime import datetime, timedelta
+import re
 from app.models.user_model import find_user_by_id
+
+
+def _parse_appointment_start(appointment_date, appointment_time):
+    """Parse slot start from '10:30' or '10:30 - 13:00'. Uses local wall-clock time."""
+    date_match = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", str(appointment_date).strip())
+    if not date_match:
+        raise ValueError("Invalid appointment date")
+
+    time_text = str(appointment_time).strip()
+    start_match = re.match(r"^(\d{1,2}):(\d{2})", time_text)
+    if not start_match:
+        raise ValueError("Invalid appointment time")
+
+    year, month, day = map(int, date_match.groups())
+    hours, minutes = map(int, start_match.groups())
+    return datetime(year, month, day, hours, minutes)
+
+
+def _parse_appointment_end(appointment_date, appointment_time):
+    """Parse slot end from range string, or default to 60 minutes after start."""
+    time_text = str(appointment_time).strip()
+    range_match = re.match(r"^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})", time_text)
+    start = _parse_appointment_start(appointment_date, appointment_time)
+
+    if not range_match:
+        return start.replace(second=0, microsecond=0) + timedelta(hours=1)
+
+    end_match = re.match(r"^(\d{1,2}):(\d{2})", range_match.group(2))
+    if not end_match:
+        return start.replace(second=0, microsecond=0) + timedelta(hours=1)
+
+    date_match = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", str(appointment_date).strip())
+    year, month, day = map(int, date_match.groups())
+    hours, minutes = map(int, end_match.groups())
+    return datetime(year, month, day, hours, minutes)
 
 
 def book_appointment():
@@ -66,6 +102,9 @@ def get_my_appointments():
 
     for a in appointments:
         a["_id"] = str(a["_id"])
+        doctor = find_user_by_id(a.get("doctorId"))
+        if doctor:
+            a["doctorName"] = doctor.get("name") or doctor.get("email")
 
     return jsonify(appointments), 200
 
@@ -81,6 +120,9 @@ def doctor_appointments():
         patient = find_user_by_id(a.get("patientId"))
         if patient:
             a["patientName"] = patient.get("name") or patient.get("email")
+        a["hasPrescription"] = (
+            mongo.db.prescriptions.find_one({"appointmentId": a["_id"]}) is not None
+        )
 
     return jsonify(appointments), 200
 
@@ -107,35 +149,54 @@ def start_consultation(appointment_id):
     try:
         appointment_id_obj = ObjectId(appointment_id)
         appointment = mongo.db.appointments.find_one({"_id": appointment_id_obj})
-    except:
+    except Exception:
         return jsonify({"error": "Invalid appointment ID"}), 400
 
     if not appointment:
         return jsonify({"error": "Appointment not found"}), 404
 
-    # Verify doctor owns this appointment
     if str(appointment.get("doctorId")) != doctor_id:
         return jsonify({"error": "You are not assigned to this appointment"}), 403
 
-    # Check if appointment is confirmed
-    if appointment.get("status") != "confirmed":
-        return jsonify({"error": f"Appointment must be confirmed to start consultation. Current status: {appointment.get('status')}"}), 400
+    status = appointment.get("status")
+    allowed_statuses = {"accepted", "confirmed", "in_progress"}
+    if status not in allowed_statuses:
+        return jsonify({
+            "error": (
+                f"Appointment must be accepted or confirmed to start consultation. "
+                f"Current status: {status}"
+            )
+        }), 400
 
-    # Check if it's time to start (within 5 minutes before or anytime after)
     try:
-        appt_datetime = datetime.fromisoformat(f"{appointment['appointmentDate']}T{appointment['appointmentTime']}")
-        now = datetime.utcnow()
-        time_until = (appt_datetime - now).total_seconds() / 60
+        appt_start = _parse_appointment_start(
+            appointment["appointmentDate"],
+            appointment["appointmentTime"],
+        )
+        appt_end = _parse_appointment_end(
+            appointment["appointmentDate"],
+            appointment["appointmentTime"],
+        )
+        now = datetime.now()
+        time_until = (appt_start - now).total_seconds() / 60
 
         if time_until > 5:
             return jsonify({
-                "error": f"Consultation will start at {appointment['appointmentTime']}",
-                "minutesUntilStart": int(time_until)
+                "error": (
+                    f"Consultation opens 5 minutes before the booked slot "
+                    f"({appointment['appointmentTime']})"
+                ),
+                "minutesUntilStart": int(time_until),
+            }), 400
+
+        if now > appt_end:
+            return jsonify({
+                "error": "This consultation window has ended",
             }), 400
     except Exception as e:
         current_app.logger.warning(f"Could not parse appointment time: {str(e)}")
+        return jsonify({"error": "Invalid appointment date or time"}), 400
 
-    # Mark appointment as in progress
     try:
         mongo.db.appointments.update_one(
             {"_id": appointment_id_obj},
@@ -143,9 +204,9 @@ def start_consultation(appointment_id):
                 "$set": {
                     "status": "in_progress",
                     "consultationStartedAt": datetime.utcnow(),
-                    "updatedAt": datetime.utcnow()
+                    "updatedAt": datetime.utcnow(),
                 }
-            }
+            },
         )
     except Exception as e:
         return jsonify({"error": f"Failed to start consultation: {str(e)}"}), 500
@@ -154,5 +215,5 @@ def start_consultation(appointment_id):
         "message": "Consultation started",
         "appointmentId": appointment_id,
         "patientId": str(appointment.get("patientId")),
-        "status": "in_progress"
+        "status": "in_progress",
     }), 200

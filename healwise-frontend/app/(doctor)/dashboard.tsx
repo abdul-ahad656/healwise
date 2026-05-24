@@ -38,7 +38,7 @@ export default function DoctorDashboard() {
 
   const pending = appointments.filter((a) => a.status === 'pending');
   const upcoming = appointments.filter((a) =>
-    ['pending', 'accepted'].includes(a.status)
+    ['pending', 'accepted', 'confirmed', 'in_progress'].includes(a.status)
   );
 
   const menuItems = [
@@ -61,7 +61,7 @@ export default function DoctorDashboard() {
       route: '/(doctor)/history' as const,
     },
     {
-      title: 'Teleconsult',
+      title: 'Teleconsultation',
       subtitle: 'Start video calls with patients',
       icon: Video,
       route: '/(doctor)/teleconsult' as const,
