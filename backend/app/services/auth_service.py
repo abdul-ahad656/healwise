@@ -39,6 +39,8 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token
 from app.models.user_model import create_user, find_user_by_email
+from app.utils.password_validator import validate_password_strength
+from app.utils.email_validator import validate_email
 
 # def register_user(name, email, password, language="en"):
 #     if find_user_by_email(email):
@@ -85,8 +87,22 @@ from app.models.user_model import create_user, find_user_by_email
 
 
 def register_user(name, email, password, language="en", role="patient"):
+    email = (email or "").strip().lower()
+    name = (name or "").strip()
+
+    if not name:
+        return {"error": "Name is required"}, 400
+
+    is_email_valid, email_error = validate_email(email)
+    if not is_email_valid:
+        return {"error": email_error}, 400
+
     if find_user_by_email(email):
         return {"error": "Email already exists"}, 400
+
+    is_valid, error_message = validate_password_strength(password)
+    if not is_valid:
+        return {"error": error_message}, 400
 
     user = {
         "name": name,

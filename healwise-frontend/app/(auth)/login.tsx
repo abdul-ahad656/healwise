@@ -11,12 +11,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   InteractionManager,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { login } from "@/services/authService";
 import { useTranslation } from "react-i18next";
 
@@ -102,38 +102,49 @@ export default function LoginScreen() {
                 <Text style={styles.subText}>{t("login_subtitle")}</Text>
 
                 <Text style={styles.label}>{t("email")}</Text>
-                <View style={styles.inputWrapper}>
-                  <Mail size={16} color="#9CA3AF" style={styles.inputIcon} />
-                  <Input
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder={t("email_placeholder")}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    style={{ paddingLeft: 40 }}
-                  />
+                <View style={styles.field}>
+                  <View style={styles.inputRow}>
+                    <View style={styles.iconSlot}>
+                      <Mail size={16} color="#9CA3AF" />
+                    </View>
+                    <TextInput
+                      value={email}
+                      onChangeText={setEmail}
+                      placeholder={t("email_placeholder")}
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      style={styles.textInput}
+                    />
+                  </View>
                 </View>
 
                 <Text style={styles.label}>{t("password")}</Text>
-                <View style={styles.inputWrapper}>
-                  <Lock size={16} color="#9CA3AF" style={styles.inputIcon} />
-                  <Input
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder={t("password_placeholder")}
-                    secureTextEntry={!showPassword}
-                    style={{ paddingLeft: 40, paddingRight: 45 }}
-                  />
-                  <Pressable
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeIcon}
-                  >
-                    {showPassword ? (
-                      <EyeOff size={18} color="#6B7280" />
-                    ) : (
-                      <Eye size={18} color="#6B7280" />
-                    )}
-                  </Pressable>
+                <View style={styles.field}>
+                  <View style={styles.inputRow}>
+                    <View style={styles.iconSlot}>
+                      <Lock size={16} color="#9CA3AF" />
+                    </View>
+                    <TextInput
+                      value={password}
+                      onChangeText={setPassword}
+                      placeholder={t("password_placeholder")}
+                      placeholderTextColor="#9CA3AF"
+                      secureTextEntry={!showPassword}
+                      style={styles.textInput}
+                    />
+                    <Pressable
+                      onPress={() => setShowPassword(!showPassword)}
+                      style={styles.iconSlot}
+                      hitSlop={8}
+                    >
+                      {showPassword ? (
+                        <EyeOff size={18} color="#6B7280" />
+                      ) : (
+                        <Eye size={18} color="#6B7280" />
+                      )}
+                    </Pressable>
+                  </View>
                 </View>
 
                 <Pressable style={styles.forgotBtn}>
@@ -238,23 +249,35 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  inputWrapper: {
-    position: "relative",
+  field: {
     marginBottom: 16,
+  },
+
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 48,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    overflow: "hidden",
+  },
+
+  iconSlot: {
+    width: 40,
+    height: 48,
+    alignItems: "center",
     justifyContent: "center",
   },
 
-  inputIcon: {
-    position: "absolute",
-    left: 12,
-    zIndex: 10,
-  },
-
-  eyeIcon: {
-    position: "absolute",
-    right: 12,
-    zIndex: 10,
-    padding: 4,
+  textInput: {
+    flex: 1,
+    height: 48,
+    fontSize: 16,
+    color: "#111827",
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
 
   forgotBtn: {
