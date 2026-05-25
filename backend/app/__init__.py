@@ -2,7 +2,7 @@ import os
 import sys
 from flask import Flask, jsonify
 from flask_cors import CORS
-from .extensions import mongo, jwt
+from .extensions import mongo, jwt, mail
 
 from .routes.auth_routes import auth_bp
 from .routes.symptom_routes import symptom_bp
@@ -31,6 +31,13 @@ def create_app():
     # Load configuration
     app.config.from_object(Config)
 
+    if Config.OTP_DEV_MODE:
+        print("📧 OTP: DEV MODE — codes printed to server console")
+    elif Config.MAIL_USERNAME and Config.MAIL_PASSWORD:
+        print(f"📧 OTP: Gmail SMTP ({Config.MAIL_USERNAME})")
+    else:
+        print("⚠️ OTP: Set GMAIL_USER and GMAIL_APP_PASSWORD in .env")
+
     # Debug logs
     print(f"✅ Flask Environment: {os.getenv('FLASK_ENV', 'production')}")
     print(
@@ -57,6 +64,14 @@ def create_app():
         print("✅ JWT initialized successfully")
     except Exception as e:
         print(f"⚠️ JWT initialization warning: {e}")
+
+    # Flask-Mail initialization
+    try:
+        print("📧 Initializing Flask-Mail...")
+        mail.init_app(app)
+        print("✅ Flask-Mail initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Flask-Mail initialization warning: {e}")
 
     # Register blueprints
     print("📦 Registering blueprints...")

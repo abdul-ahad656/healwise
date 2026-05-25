@@ -20,6 +20,7 @@ import { register } from "@/services/authService";
 import { useTranslation } from "react-i18next";
 import { validatePassword, validatePasswordMatch } from "@/utils/passwordValidator";
 import { validateEmail } from "@/utils/emailValidator";
+import { EmailOtpVerification } from "@/components/auth/EmailOtpVerification";
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
 
   const passwordValidation = validatePassword(form.password);
   const passwordMatchesConfirm = validatePasswordMatch(form.password, form.confirmPassword);
@@ -43,6 +45,7 @@ export default function RegisterScreen() {
   const isFormValid =
     form.name.trim().length > 0 &&
     emailValidation.isValid &&
+    !!verificationToken &&
     passwordValidation.isValid &&
     passwordMatchesConfirm;
 
@@ -51,7 +54,13 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      await register(form.name.trim(), form.email.trim().toLowerCase(), form.password, 'patient');
+      await register(
+        form.name.trim(),
+        form.email.trim().toLowerCase(),
+        form.password,
+        'patient',
+        verificationToken!
+      );
       InteractionManager.runAfterInteractions(() => {
         router.replace({
           pathname: "/(auth)/language",
@@ -129,7 +138,10 @@ export default function RegisterScreen() {
               </View>
               <TextInput
                 value={form.email}
-                onChangeText={(v) => setForm({ ...form, email: v })}
+                onChangeText={(v) => {
+                  setForm({ ...form, email: v });
+                  setVerificationToken(null);
+                }}
                 placeholder={t("email_register_placeholder")}
                 placeholderTextColor="#9CA3AF"
                 keyboardType="email-address"
@@ -142,6 +154,14 @@ export default function RegisterScreen() {
               <Text style={styles.fieldError}>{t(emailValidation.error)}</Text>
             ) : null}
           </View>
+
+          <Text style={styles.sectionLabel}>{t("otp_verify_email_section")}</Text>
+          <EmailOtpVerification
+            email={form.email}
+            purpose="register"
+            emailEditable={false}
+            onVerified={setVerificationToken}
+          />
 
           <Text style={styles.label}>{t("password")}</Text>
           <View style={styles.field}>
@@ -262,6 +282,13 @@ const styles = StyleSheet.create({
   avatarGradient: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   avatarText: { fontSize: 16, fontWeight: '600', color: '#1f2937' },
   label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 8 },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1d4ed8',
+    marginBottom: 10,
+    marginTop: 4,
+  },
   field: { marginBottom: 16 },
   inputRow: {
     flexDirection: 'row',

@@ -51,7 +51,8 @@ export const register = async (
   name: string,
   email: string,
   password: string,
-  role: string = 'patient'
+  role: string = 'patient',
+  verificationToken: string
 ): Promise<AuthResponse> => {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
@@ -59,7 +60,13 @@ export const register = async (
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name, email, password, role }),
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        role,
+        verification_token: verificationToken,
+      }),
     });
 
     const data = await response.json();
@@ -109,4 +116,27 @@ export const setLanguagePreference = async (language: 'en' | 'ur'): Promise<void
   const user = AuthStore.getUser();
   AuthStore.setUser({ ...(user || {}), language });
   i18n.changeLanguage(language);
+};
+
+export const resetPassword = async (
+  email: string,
+  password: string,
+  verificationToken: string
+): Promise<void> => {
+  const { response, data } = await fetchJson<{ error?: string; message?: string }>(
+    `${API_BASE_URL}/auth/reset-password`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        password,
+        verification_token: verificationToken,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to reset password');
+  }
 };

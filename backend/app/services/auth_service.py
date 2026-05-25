@@ -41,6 +41,9 @@ from flask_jwt_extended import create_access_token
 from app.models.user_model import create_user, find_user_by_email
 from app.utils.password_validator import validate_password_strength
 from app.utils.email_validator import validate_email
+from app.utils.jwt_verification import validate_verification_token
+from bson.objectid import ObjectId
+from app.extensions import mongo
 
 # def register_user(name, email, password, language="en"):
 #     if find_user_by_email(email):
@@ -86,9 +89,16 @@ from app.utils.email_validator import validate_email
 #     }, 201
 
 
-def register_user(name, email, password, language="en", role="patient"):
+def register_user(name, email, password, language="en", role="patient", verification_token=None):
     email = (email or "").strip().lower()
     name = (name or "").strip()
+
+    if not verification_token:
+        return {"error": "Email verification required. Please verify OTP first."}, 400
+
+    token_ok, token_error = validate_verification_token(verification_token, email)
+    if not token_ok:
+        return {"error": token_error}, 401
 
     if not name:
         return {"error": "Name is required"}, 400
@@ -133,6 +143,7 @@ def register_user(name, email, password, language="en", role="patient"):
 
 
 def login_user(email, password):
+    email = (email or "").strip().lower()
     user = find_user_by_email(email)
     if not user or not check_password_hash(user["password"], password):
         return {"error": "Invalid credentials"}, 401
@@ -155,3 +166,59 @@ def login_user(email, password):
             "role": role
         }
     }, 200
+
+
+def reset_password(email, password, verification_token):
+    """Reset password after OTP verification."""
+    email = (email or "").strip().lower()
+
+    token_ok, token_error = validate_verification_token(verification_token, email)
+    if not token_ok:
+        return {"error": token_error}, 401
+
+    is_email_valid, email_error = validate_email(email)
+    if not is_email_valid:
+        return {"error": email_error}, 400
+
+    user = find_user_by_email(email)
+    if not user:
+        return {"error": "No account found with this email"}, 404
+
+    is_valid, error_message = validate_password_strength(password)
+    if not is_valid:
+        return {"error": error_message}, 400
+
+    mongo.db.users.update_one(
+        {"_id": ObjectId(user["_id"])},
+        {"$set": {"password": generate_password_hash(password)}},
+    )
+
+    return {"message": "Password reset successfully"}, 200
+
+
+def reset_password(email, password, verification_token):
+    """Reset password after OTP verification."""
+    email = (email or "").strip().lower()
+
+    token_ok, token_error = validate_verification_token(verification_token, email)
+    if not token_ok:
+        return {"error": token_error}, 401
+
+    is_email_valid, email_error = validate_email(email)
+    if not is_email_valid:
+        return {"error": email_error}, 400
+
+    user = find_user_by_email(email)
+    if not user:
+        return {"error": "No account found with this email"}, 404
+
+    is_valid, error_message = validate_password_strength(password)
+    if not is_valid:
+        return {"error": error_message}, 400
+
+    mongo.db.users.update_one(
+        {"_id": ObjectId(user["_id"])},
+        {"$set": {"password": generate_password_hash(password)}},
+    )
+
+    return {"message": "Password reset successfully"}, 200

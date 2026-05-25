@@ -14,7 +14,7 @@ from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson.objectid import ObjectId
 from app.extensions import mongo
-from app.services.auth_service import register_user, login_user
+from app.services.auth_service import register_user, login_user, reset_password
 
 def register():
     data = request.json
@@ -29,7 +29,8 @@ def register():
         email=data.get("email"),
         password=data.get("password"),
         language=data.get("language", "en"),
-        role=role
+        role=role,
+        verification_token=data.get("verification_token"),
     )
 
 def login():
@@ -37,6 +38,15 @@ def login():
     return login_user(
         data["email"],
         data["password"]
+    )
+
+
+def reset_password_handler():
+    data = request.json or {}
+    return reset_password(
+        email=data.get("email"),
+        password=data.get("password"),
+        verification_token=data.get("verification_token"),
     )
 
 

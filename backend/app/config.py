@@ -11,9 +11,9 @@ load_dotenv(os.path.join(_BACKEND_ROOT, ".env"))
 class Config:
     """Application configuration loaded from environment variables."""
 
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-change-me")
-    FLASK_ENV = os.getenv("FLASK_ENV", "development")
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+    FLASK_ENV = os.getenv("FLASK_ENV")
 
     MONGO_URI = os.getenv("MONGO_URI")
 
@@ -23,7 +23,7 @@ class Config:
     HF_PREDICT_TIMEOUT = int(os.getenv("HF_PREDICT_TIMEOUT", "90"))
 
     # Legacy local model path (optional fallback; symptom flow uses HF by default)
-    ML_MODEL_DIR = os.getenv("ML_MODEL_DIR", "app/ml_model/clinicalbert_finetuned")
+    ML_MODEL_DIR = os.getenv("ML_MODEL_DIR")
 
     # Cloudinary
     CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
@@ -37,7 +37,17 @@ class Config:
     STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
     STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
     STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
-    APPOINTMENT_CONSULTATION_FEE = int(os.getenv("APPOINTMENT_CONSULTATION_FEE", "5000"))  # in cents
+
+    # OTP email via Gmail SMTP (Flask-Mail)
+    OTP_DEV_MODE = os.getenv("OTP_DEV_MODE", "").lower() in ("1", "true", "yes")
+
+    # Flask-Mail (Gmail SMTP)
+    MAIL_SERVER = "smtp.gmail.com"
+    MAIL_PORT = 587
+    MAIL_USE_TLS = True
+    MAIL_USERNAME = os.getenv("GMAIL_USER")
+    MAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+    MAIL_DEFAULT_SENDER = os.getenv("GMAIL_USER")
 
     # Easypaisa Payment
     EASYPAISA_RECEIVER_NUMBER = "03144828190"

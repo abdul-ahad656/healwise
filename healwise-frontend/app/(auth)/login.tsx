@@ -19,6 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Card } from "@/components/ui/card";
 import { login } from "@/services/authService";
 import { useTranslation } from "react-i18next";
+import { validateEmail } from "@/utils/emailValidator";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -28,11 +29,13 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const emailValidation = validateEmail(email);
+
   const handleLogin = async () => {
-    if (!email || !password) return;
+    if (!emailValidation.isValid || !password) return;
     setLoading(true);
     try {
-      const data = await login(email, password);
+      const data = await login(email.trim().toLowerCase(), password);
       const role = data.user.role;
       const userLang = data.user?.language;
 
@@ -103,7 +106,14 @@ export default function LoginScreen() {
 
                 <Text style={styles.label}>{t("email")}</Text>
                 <View style={styles.field}>
-                  <View style={styles.inputRow}>
+                  <View
+                    style={[
+                      styles.inputRow,
+                      email.length > 0 &&
+                        !emailValidation.isValid &&
+                        styles.inputRowError,
+                    ]}
+                  >
                     <View style={styles.iconSlot}>
                       <Mail size={16} color="#9CA3AF" />
                     </View>
@@ -117,6 +127,9 @@ export default function LoginScreen() {
                       style={styles.textInput}
                     />
                   </View>
+                  {email.length > 0 && !emailValidation.isValid && emailValidation.error ? (
+                    <Text style={styles.fieldError}>{t(emailValidation.error)}</Text>
+                  ) : null}
                 </View>
 
                 <Text style={styles.label}>{t("password")}</Text>
@@ -147,16 +160,19 @@ export default function LoginScreen() {
                   </View>
                 </View>
 
-                <Pressable style={styles.forgotBtn}>
+                <Pressable
+                  style={styles.forgotBtn}
+                  onPress={() => router.push('/(auth)/forgot-password')}
+                >
                   <Text style={styles.forgotText}>{t("forgot_password")}</Text>
                 </Pressable>
 
                 <Pressable
                 onPress={handleLogin}
-                disabled={!email || !password || loading}
+                disabled={!emailValidation.isValid || !password || loading}
                 style={[
                   styles.submitButton,
-                  (!email || !password || loading) && { opacity: 0.5 },
+                  (!emailValidation.isValid || !password || loading) && { opacity: 0.5 },
                   ]}
                   >
                     <Text style={styles.submitButtonText}>
@@ -278,6 +294,17 @@ const styles = StyleSheet.create({
     color: "#111827",
     paddingVertical: 0,
     paddingHorizontal: 0,
+  },
+
+  inputRowError: {
+    borderColor: "#ef4444",
+  },
+
+  fieldError: {
+    marginTop: 6,
+    fontSize: 13,
+    color: "#ef4444",
+    lineHeight: 18,
   },
 
   forgotBtn: {
