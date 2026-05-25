@@ -78,6 +78,19 @@ def submit_symptoms():
     }), 200
 
 
+def get_my_symptom_history():
+    """Patient's own symptom analysis history."""
+    user_id = get_jwt_identity()
+    history = get_user_symptoms(user_id)
+
+    for item in history:
+        item["_id"] = str(item["_id"])
+        if item.get("createdAt"):
+            item["createdAt"] = item["createdAt"].isoformat()
+
+    return jsonify(history), 200
+
+
 def get_patient_history_for_appointment(appointment_id: str):
     doctor_id = get_jwt_identity()
 

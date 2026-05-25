@@ -3,20 +3,19 @@ import {
   StyleSheet,
   View,
   Text,
-  Pressable,
+  TouchableOpacity,
   ScrollView,
   ActivityIndicator,
   Alert,
   RefreshControl,
-  SafeAreaView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { ArrowLeft, Video, Calendar, Clock, User } from 'lucide-react-native';
+import { Video, Calendar, Clock, User } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
+import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import ConsultationRoom from '@/components/VideoCall/ConsultationRoom';
 import { getPatientAppointments, Appointment } from '@/services/doctorPanelService';
 import AuthStore from '@/services/authStore';
+import { patientScreenStyles as s } from '@/styles/patientScreen';
 import {
   canStartTeleconsult,
   isJoinableStatus,
@@ -29,7 +28,6 @@ interface CallState {
 }
 
 export default function AppointmentsScreen() {
-  const router = useRouter();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -44,11 +42,17 @@ export default function AppointmentsScreen() {
     try {
       setError(null);
       const data = await getPatientAppointments();
-      setAppointments(data.sort((a, b) =>
-        new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime()
-      ));
-    } catch (err: any) {
-      setError(err.message || 'Failed to load appointments');
+      setAppointments(
+        data.sort(
+          (a, b) =>
+            new Date(b.appointmentDate).getTime() -
+            new Date(a.appointmentDate).getTime()
+        )
+      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load appointments';
+      setError(message);
       console.error('Error loading appointments:', err);
     } finally {
       setLoading(false);
@@ -122,10 +126,9 @@ export default function AppointmentsScreen() {
     }
   };
 
-  // Active call screen
   if (activeCall) {
     return (
-      <View style={styles.callContainer}>
+      <View style={local.callContainer}>
         <ConsultationRoom
           appointmentId={activeCall.appointmentId}
           userID={activeCall.userID}
@@ -136,67 +139,47 @@ export default function AppointmentsScreen() {
     );
   }
 
-  // Appointments list screen
   return (
-    <View style={styles.container}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f9fafb' }]} />
+    <View style={s.container}>
+      <View style={[StyleSheet.absoluteFill, s.pageBg]} />
 
-      <LinearGradient
+      <PatientScreenHeader
+        title="My Appointments"
+        subtitle="Manage your doctor consultations"
         colors={['#06b6d4', '#22c55e']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView>
-          <View style={styles.headerContent}>
-            <Pressable
-              onPress={() => router.back()}
-              hitSlop={20}
-              style={({ pressed }) => [
-                styles.backButton,
-                { opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <ArrowLeft size={22} color="white" />
-            </Pressable>
-            <View>
-              <Text style={styles.headerTitle}>My Appointments</Text>
-              <Text style={styles.headerSubtitle}>Manage your doctor consultations</Text>
-            </View>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+      />
 
       <ScrollView
-        style={styles.body}
-        contentContainerStyle={styles.bodyContent}
+        style={s.scroll}
+        contentContainerStyle={s.tabListContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {loading ? (
-          <View style={styles.centerContainer}>
+          <View style={local.center}>
             <ActivityIndicator size="large" color="#06b6d4" />
-            <Text style={styles.loadingText}>Loading appointments...</Text>
+            <Text style={s.infoText}>Loading appointments…</Text>
           </View>
         ) : error ? (
-          <Card style={styles.errorCard}>
-            <Text style={styles.errorText}>{error}</Text>
-            <Pressable
+          <Card style={local.errorCard}>
+            <Text style={s.errorText}>{error}</Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
               onPress={loadAppointments}
-              style={({ pressed }) => [
-                styles.retryBtn,
-                { opacity: pressed ? 0.8 : 1 },
-              ]}
+              style={local.retryBtn}
             >
-              <Text style={styles.retryText}>Retry</Text>
-            </Pressable>
+              <Text style={local.retryText}>Retry</Text>
+            </TouchableOpacity>
           </Card>
         ) : appointments.length === 0 ? (
-          <Card style={styles.emptyCard}>
+          <Card style={local.emptyCard}>
             <Calendar size={48} color="#d1d5db" />
-            <Text style={styles.emptyTitle}>No Appointments Yet</Text>
-            <Text style={styles.emptyText}>
-              Your appointments with doctors will appear here. Book a consultation to get started.
+            <Text style={local.emptyTitle}>No Appointments Yet</Text>
+            <Text style={local.emptyText}>
+              Your appointments with doctors will appear here. Book a consultation to
+              get started.
             </Text>
           </Card>
         ) : (
@@ -207,55 +190,50 @@ export default function AppointmentsScreen() {
               appointment.appointmentDate,
               appointment.appointmentTime
             );
-            const canJoin = isJoinableStatus(appointment.status) && joinWindow.canJoin;
+            const canJoin =
+              isJoinableStatus(appointment.status) && joinWindow.canJoin;
+
             return (
-              <Card key={appointment._id} style={styles.appointmentCard}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.doctorInfo}>
-                    <View style={styles.doctorNameRow}>
-                      <User size={16} color="#6b7280" />
-                      <Text style={styles.doctorName}>
-                        {appointment.doctorName || 'Doctor'}
-                      </Text>
-                    </View>
+              <Card key={appointment._id} style={local.card}>
+                <View style={local.cardHeader}>
+                  <View style={local.doctorNameRow}>
+                    <User size={16} color="#6b7280" />
+                    <Text style={local.doctorName}>
+                      {appointment.doctorName || 'Doctor'}
+                    </Text>
                   </View>
                   <View
                     style={[
-                      styles.statusBadge,
+                      local.statusBadge,
                       {
                         backgroundColor: statusColor.bg,
                         borderColor: statusColor.border,
                       },
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.statusText,
-                        { color: statusColor.text },
-                      ]}
-                    >
+                    <Text style={[local.statusText, { color: statusColor.text }]}>
                       {appointment.status.charAt(0).toUpperCase() +
                         appointment.status.slice(1)}
                     </Text>
                   </View>
                 </View>
 
-                <View style={styles.detailsSection}>
-                  <View style={styles.detailRow}>
-                    <Calendar size={14} color="#6b7280" />
-                    <View style={styles.detailText}>
-                      <Text style={styles.detailLabel}>Date</Text>
-                      <Text style={styles.detailValue}>
+                <View style={local.detailsSection}>
+                  <View style={local.detailRow}>
+                    <Calendar size={16} color="#6b7280" />
+                    <View style={local.detailText}>
+                      <Text style={local.detailLabel}>Date</Text>
+                      <Text style={local.detailValue}>
                         {formatDate(appointment.appointmentDate)}
                       </Text>
                     </View>
                   </View>
 
-                  <View style={styles.detailRow}>
-                    <Clock size={14} color="#6b7280" />
-                    <View style={styles.detailText}>
-                      <Text style={styles.detailLabel}>Time</Text>
-                      <Text style={styles.detailValue}>
+                  <View style={local.detailRow}>
+                    <Clock size={16} color="#6b7280" />
+                    <View style={local.detailText}>
+                      <Text style={local.detailLabel}>Time</Text>
+                      <Text style={local.detailValue}>
                         {appointment.appointmentTime}
                       </Text>
                     </View>
@@ -263,19 +241,17 @@ export default function AppointmentsScreen() {
                 </View>
 
                 {canJoin ? (
-                  <Pressable
+                  <TouchableOpacity
+                    activeOpacity={0.85}
                     onPress={() => startCall(appointment)}
-                    style={({ pressed }) => [
-                      styles.joinCallBtn,
-                      { opacity: pressed ? 0.9 : 1 },
-                    ]}
+                    style={local.joinBtn}
                   >
-                    <Video size={16} color="white" />
-                    <Text style={styles.joinCallText}>Join Video Call</Text>
-                  </Pressable>
+                    <Video size={18} color="#ffffff" />
+                    <Text style={local.joinBtnText}>Join video call</Text>
+                  </TouchableOpacity>
                 ) : (
-                  <View style={styles.disabledBtn}>
-                    <Text style={styles.disabledBtnText}>
+                  <View style={local.disabledBox}>
+                    <Text style={local.disabledText}>
                       {appointment.status === 'pending'
                         ? 'Waiting for doctor to accept'
                         : isJoinableStatus(appointment.status)
@@ -293,97 +269,61 @@ export default function AppointmentsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  headerContent: {
-    flexDirection: 'row',
+const local = StyleSheet.create({
+  callContainer: { flex: 1 },
+  center: {
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 280,
+    paddingVertical: 24,
     gap: 12,
-    marginTop: 10,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: 'white' },
-  headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.9)', marginTop: 2 },
-  body: { flex: 1, marginTop: -20 },
-  bodyContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
-  },
-  centerContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 300,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
   },
   errorCard: {
     padding: 20,
     borderRadius: 16,
     alignItems: 'center',
-    marginVertical: 40,
+    marginTop: 8,
     backgroundColor: '#fef2f2',
     borderWidth: 1,
     borderColor: '#fecaca',
-  },
-  errorText: {
-    fontSize: 14,
-    color: '#b91c1c',
-    textAlign: 'center',
-    marginBottom: 12,
-    fontWeight: '500',
+    gap: 12,
   },
   retryBtn: {
     backgroundColor: '#b91c1c',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#991b1b',
   },
   retryText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 13,
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 14,
   },
   emptyCard: {
     padding: 32,
     borderRadius: 20,
     alignItems: 'center',
-    marginVertical: 40,
+    marginTop: 8,
+    gap: 8,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#111827',
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: 8,
   },
   emptyText: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#6b7280',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
   },
-  appointmentCard: {
-    padding: 16,
+  card: {
+    padding: 18,
     borderRadius: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
@@ -391,76 +331,88 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
+    gap: 12,
   },
-  doctorInfo: { flex: 1 },
   doctorNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
   },
   doctorName: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#111827',
+    flexShrink: 1,
   },
   statusBadge: {
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 10,
     borderWidth: 1,
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   detailsSection: {
     backgroundColor: '#f3f4f6',
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    gap: 8,
+    padding: 14,
+    marginBottom: 14,
+    gap: 12,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: 10,
   },
   detailText: { flex: 1 },
   detailLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#6b7280',
-    marginBottom: 1,
+    marginBottom: 2,
   },
   detailValue: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#111827',
+    lineHeight: 20,
   },
-  joinCallBtn: {
-    backgroundColor: '#06b6d4',
-    borderRadius: 12,
-    paddingVertical: 11,
+  joinBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    backgroundColor: '#0891b2',
+    borderWidth: 2,
+    borderColor: '#0e7490',
+    borderRadius: 12,
+    minHeight: 50,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    elevation: 4,
   },
-  joinCallText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+  joinBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '800',
   },
-  disabledBtn: {
+  disabledBox: {
     backgroundColor: '#f3f4f6',
     borderRadius: 12,
-    paddingVertical: 11,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  disabledBtnText: {
-    color: '#9ca3af',
-    fontSize: 12,
-    fontWeight: '500',
+  disabledText: {
+    color: '#6b7280',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 18,
   },
-  callContainer: { flex: 1 },
 });

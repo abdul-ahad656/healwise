@@ -40,6 +40,12 @@ export const patientScreenStyles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
   },
+  tabListContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 120,
+    gap: 0,
+  },
 });
 
 export const patientHeaderStyles = StyleSheet.create({
