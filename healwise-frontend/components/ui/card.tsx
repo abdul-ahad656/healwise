@@ -1,5 +1,3 @@
-
-
 import React from "react";
 import { View, Text, StyleSheet, ViewStyle, TextStyle, StyleProp } from "react-native";
 

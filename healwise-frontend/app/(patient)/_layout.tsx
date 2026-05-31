@@ -60,6 +60,10 @@ export default function PatientLayout() {
       <Tabs.Screen name="consult-doctor/booking" options={{ href: null }} />
       <Tabs.Screen name="symptom-checker/index" options={{ href: null }} />
       <Tabs.Screen name="symptom-checker/result" options={{ href: null }} />
+      <Tabs.Screen name="symptom-history/index" options={{ href: null }} />
+      <Tabs.Screen name="symptom-history/detail" options={{ href: null }} />
+      <Tabs.Screen name="medicine-history/index" options={{ href: null }} />
+      <Tabs.Screen name="medicine-history/detail" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -1,21 +1,3 @@
-/**
- * ConsultationRoom – Web (Browser)
- *
- * Uses @zegocloud/zego-uikit-prebuilt (standard JS SDK) to render a
- * full-page one-on-one video call inside a plain <div> container.
- *
- * The joinRoom logic runs inside a useEffect so the SDK is initialised once
- * the container div is mounted in the DOM.  The ZEGOCLOUD instance is
- * destroyed on unmount to release mic/camera resources.
- *
- * Platform resolution: Metro / Webpack prefer the .web.tsx file for all web
- * (browser) builds over the base .tsx file which targets native platforms.
- *
- * NOTE: generateKitTokenForTest embeds the App Sign client-side and is
- * intended for development / prototyping.  For production, generate the kit
- * token on your backend and pass it to ZegoUIKitPrebuilt.create().
- */
-
 import React, { useEffect, useRef } from 'react';
 import { useZegoConfig } from '@/hooks/useZegoConfig';
 

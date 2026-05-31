@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,39 +6,16 @@ import {
   Pressable,
   Alert,
   ScrollView,
-  ActivityIndicator,
-  RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useRouter, type Href } from 'expo-router';
 import { Thermometer, Pill, ChevronRight } from 'lucide-react-native';
 import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import { PatientPrimaryButton } from '@/components/patient/PatientPrimaryButton';
 import { patientScreenStyles as s } from '@/styles/patientScreen';
 import AuthStore from '@/services/authStore';
 import { setLanguagePreference } from '@/services/authService';
-import { getSymptomHistory, SymptomHistoryEntry } from '@/services/symptomService';
-import {
-  getMedicineHistory,
-  MedicineHistoryEntry,
-} from '@/services/medicineService';
 
 type Lang = 'en' | 'ur';
-
-function formatWhen(dateString?: string) {
-  if (!dateString) return '—';
-  try {
-    return new Date(dateString).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  } catch {
-    return dateString;
-  }
-}
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -47,43 +24,6 @@ export default function ProfileScreen() {
   const initialLang: Lang = (user?.language === 'ur' ? 'ur' : 'en') as Lang;
   const [selected, setSelected] = useState<Lang>(initialLang);
   const [saving, setSaving] = useState(false);
-
-  const [symptomHistory, setSymptomHistory] = useState<SymptomHistoryEntry[]>([]);
-  const [medicineHistory, setMedicineHistory] = useState<MedicineHistoryEntry[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [historyRefreshing, setHistoryRefreshing] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-
-  const loadHistory = useCallback(async () => {
-    try {
-      setHistoryError(null);
-      const [symptoms, medicines] = await Promise.all([
-        getSymptomHistory(),
-        getMedicineHistory(),
-      ]);
-      setSymptomHistory(symptoms);
-      setMedicineHistory(medicines);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to load history';
-      setHistoryError(message);
-    } finally {
-      setHistoryLoading(false);
-      setHistoryRefreshing(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      setHistoryLoading(true);
-      loadHistory();
-    }, [loadHistory])
-  );
-
-  const onHistoryRefresh = () => {
-    setHistoryRefreshing(true);
-    loadHistory();
-  };
 
   const handleLogout = () => {
     AuthStore.clear();
@@ -117,12 +57,6 @@ export default function ProfileScreen() {
         style={s.scroll}
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={historyRefreshing}
-            onRefresh={onHistoryRefresh}
-          />
-        }
       >
         <Text style={styles.name}>{name}</Text>
         {email ? <Text style={styles.email}>{email}</Text> : null}
@@ -169,91 +103,53 @@ export default function ProfileScreen() {
           />
         </View>
 
-        {historyError ? (
-          <Text style={s.errorText}>{historyError}</Text>
-        ) : null}
+        <Text style={styles.sectionLabel}>Activity history</Text>
 
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <Thermometer size={20} color="#ef4444" />
-            <Text style={styles.cardTitle}>Symptom analysis history</Text>
+        <Pressable
+          onPress={() => router.push('/(patient)/symptom-history' as Href)}
+          style={({ pressed }) => [
+            styles.menuRow,
+            { opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          <View style={[styles.menuIcon, { backgroundColor: '#fef2f2' }]}>
+            <Thermometer size={22} color="#ef4444" />
           </View>
-
-          {historyLoading ? (
-            <ActivityIndicator color="#2563eb" style={{ marginVertical: 12 }} />
-          ) : symptomHistory.length === 0 ? (
-            <Text style={styles.emptyHistory}>
-              No symptom checks yet. Use the symptom checker from Home.
+          <View style={styles.menuText}>
+            <Text style={styles.menuTitle} numberOfLines={1}>
+              Symptom analysis history
             </Text>
-          ) : (
-            symptomHistory.slice(0, 10).map((item) => (
-              <View key={item._id} style={styles.historyItem}>
-                <Text style={styles.historyMain} numberOfLines={2}>
-                  {item.aiPrediction}
-                </Text>
-                <Text style={styles.historyMeta}>
-                  {Math.round((item.confidence ?? 0) * 100)}% confidence ·{' '}
-                  {formatWhen(item.createdAt)}
-                </Text>
-                {item.text ? (
-                  <Text style={styles.historySub} numberOfLines={2}>
-                    {item.text}
-                  </Text>
-                ) : null}
-              </View>
-            ))
-          )}
-
-          <Pressable
-            onPress={() => router.push('/(patient)/symptom-checker')}
-            style={({ pressed }) => [
-              styles.linkRow,
-              { opacity: pressed ? 0.8 : 1 },
-            ]}
-          >
-            <Text style={styles.linkText}>New symptom check</Text>
-            <ChevronRight size={18} color="#2563eb" />
-          </Pressable>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <Pill size={20} color="#3b82f6" />
-            <Text style={styles.cardTitle}>Medicine comparison history</Text>
+            <Text style={styles.menuSubtitle} numberOfLines={2}>
+              View past symptom check results
+            </Text>
           </View>
+          <View style={styles.chevronWrap}>
+            <ChevronRight size={20} color="#9ca3af" />
+          </View>
+        </Pressable>
 
-          {historyLoading ? (
-            <ActivityIndicator color="#2563eb" style={{ marginVertical: 12 }} />
-          ) : medicineHistory.length === 0 ? (
-            <Text style={styles.emptyHistory}>
-              No comparisons yet. Compare medicines from Home.
+        <Pressable
+          onPress={() => router.push('/(patient)/medicine-history' as Href)}
+          style={({ pressed }) => [
+            styles.menuRow,
+            { opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          <View style={[styles.menuIcon, { backgroundColor: '#eff6ff' }]}>
+            <Pill size={22} color="#3b82f6" />
+          </View>
+          <View style={styles.menuText}>
+            <Text style={styles.menuTitle} numberOfLines={1}>
+              Medicine comparison history
             </Text>
-          ) : (
-            medicineHistory.slice(0, 10).map((item) => (
-              <View key={item._id} style={styles.historyItem}>
-                <Text style={styles.historyMain} numberOfLines={1}>
-                  {item.query || item.result?.input_medicine || 'Comparison'}
-                </Text>
-                <Text style={styles.historyMeta}>
-                  Salt: {item.result?.salt || '—'} ·{' '}
-                  {item.result?.alternatives?.length ?? 0} alternatives ·{' '}
-                  {formatWhen(item.createdAt)}
-                </Text>
-              </View>
-            ))
-          )}
-
-          <Pressable
-            onPress={() => router.push('/(patient)/medicine-compare')}
-            style={({ pressed }) => [
-              styles.linkRow,
-              { opacity: pressed ? 0.8 : 1 },
-            ]}
-          >
-            <Text style={styles.linkText}>Compare medicines</Text>
-            <ChevronRight size={18} color="#2563eb" />
-          </Pressable>
-        </View>
+            <Text style={styles.menuSubtitle} numberOfLines={2}>
+              View past medicine comparisons
+            </Text>
+          </View>
+          <View style={styles.chevronWrap}>
+            <ChevronRight size={20} color="#9ca3af" />
+          </View>
+        </Pressable>
 
         <Pressable onPress={handleLogout} style={styles.logoutBtn}>
           <Text style={styles.logoutText}>Logout</Text>
@@ -281,19 +177,62 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    marginBottom: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 14,
+    marginBottom: 20,
   },
   cardTitle: {
     fontSize: 16,
     fontWeight: '800',
     color: '#111827',
+    marginBottom: 14,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6b7280',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginBottom: 12,
+  },
+  menuIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginRight: 14,
+  },
+  menuText: {
     flex: 1,
+    minWidth: 0,
+    flexShrink: 1,
+    paddingRight: 8,
+  },
+  chevronWrap: {
+    flexShrink: 0,
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  menuSubtitle: {
+    fontSize: 13,
+    color: '#6b7280',
   },
   radioRow: {
     flexDirection: 'row',
@@ -331,47 +270,6 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontWeight: '700',
   },
-  emptyHistory: {
-    fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  historyItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  historyMain: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  historyMeta: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginBottom: 4,
-  },
-  historySub: {
-    fontSize: 13,
-    color: '#374151',
-    lineHeight: 18,
-  },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  linkText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#2563eb',
-  },
   logoutBtn: {
     backgroundColor: '#fee2e2',
     minHeight: 50,
@@ -380,7 +278,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#fecaca',
-    marginTop: 4,
+    marginTop: 12,
   },
   logoutText: {
     color: '#b91c1c',

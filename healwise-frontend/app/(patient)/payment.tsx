@@ -5,11 +5,11 @@ import {
   Text,
   Pressable,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
   TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, CreditCard, CheckCircle, Copy } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -233,7 +233,7 @@ export default function PaymentScreen() {
           end={{ x: 1, y: 0 }}
           style={styles.header}
         >
-          <SafeAreaView>
+          <SafeAreaView edges={['top']}>
             <View style={styles.headerContent}>
               <Pressable
                 onPress={() => router.back()}
@@ -261,7 +261,7 @@ export default function PaymentScreen() {
           end={{ x: 1, y: 0 }}
           style={styles.header}
         >
-          <SafeAreaView>
+          <SafeAreaView edges={['top']}>
             <View style={styles.headerContent}>
               <Text style={styles.headerTitle}>
                 {paymentSuccess ? 'Payment Complete' : 'Proof Submitted'}
@@ -300,7 +300,7 @@ export default function PaymentScreen() {
         end={{ x: 1, y: 0 }}
         style={styles.header}
       >
-        <SafeAreaView>
+        <SafeAreaView edges={['top']}>
           <View style={styles.headerContent}>
             <Pressable
               onPress={() => router.back()}

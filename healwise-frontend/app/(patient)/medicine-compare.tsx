@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,8 +8,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Platform,
-  NativeModules,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,7 +18,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { compareMedicines, CompareResult } from '@/services/medicineService';
 import { useTranslation } from 'react-i18next';
-import Voice, { SpeechResultsEvent } from '@react-native-voice/voice';
+import {
+  getVoiceModule,
+  isVoiceNativeLinked,
+  isVoicePlatformSupported,
+} from '@/services/voiceRecognition';
 
 export default function MedicineComparison() {
   const router = useRouter();
@@ -32,16 +34,14 @@ export default function MedicineComparison() {
   const [isListening, setIsListening] = useState(false);
   const { t } = useTranslation();
 
-  const isVoiceSupported = Platform.OS === 'ios' || Platform.OS === 'android';
-  const isVoiceNativeLinked = useMemo(
-    () =>
-      isVoiceSupported &&
-      (NativeModules.RCTVoice != null || NativeModules.Voice != null),
-    [isVoiceSupported]
-  );
+  const isVoiceSupported = isVoicePlatformSupported();
+  const isVoiceLinked = isVoiceNativeLinked();
 
   useEffect(() => {
-    if (!isVoiceSupported || !isVoiceNativeLinked || !isFocused) return;
+    if (!isVoiceSupported || !isVoiceLinked || !isFocused) return;
+
+    const Voice = getVoiceModule();
+    if (!Voice) return;
 
     Voice.onSpeechStart = () => {
       setIsListening(true);
@@ -51,13 +51,13 @@ export default function MedicineComparison() {
       setIsListening(false);
     };
 
-    Voice.onSpeechResults = (e: SpeechResultsEvent) => {
+    Voice.onSpeechResults = (e) => {
       if (isFocused && e.value && e.value[0]) {
         setSearchTerm(e.value[0]);
       }
     };
 
-    Voice.onSpeechError = (e: any) => {
+    Voice.onSpeechError = (e) => {
       if (isFocused) {
         setIsListening(false);
         console.error('Voice error:', e);
@@ -77,7 +77,7 @@ export default function MedicineComparison() {
           } catch {}
         });
     };
-  }, [isVoiceSupported, isVoiceNativeLinked, isFocused]);
+  }, [isVoiceSupported, isVoiceLinked, isFocused]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -95,7 +95,12 @@ export default function MedicineComparison() {
         Alert.alert('Error', 'Voice input is not supported on this platform');
         return;
       }
-      if (!isVoiceNativeLinked) {
+      if (!isVoiceLinked) {
+        Alert.alert('Error', 'Voice recognition is not available');
+        return;
+      }
+      const Voice = getVoiceModule();
+      if (!Voice) {
         Alert.alert('Error', 'Voice recognition is not available');
         return;
       }
@@ -109,7 +114,10 @@ export default function MedicineComparison() {
 
   const stopListening = async () => {
     try {
-      await Voice.stop();
+      const Voice = getVoiceModule();
+      if (Voice) {
+        await Voice.stop();
+      }
     } catch (err) {
       console.error('Stop listening error:', err);
     }
@@ -190,11 +198,11 @@ export default function MedicineComparison() {
             />
             <Pressable
               onPress={handleMicPress}
-              disabled={!isVoiceNativeLinked}
+              disabled={!isVoiceLinked}
               style={({ pressed }) => [
                 styles.micButton,
                 isListening && styles.micButtonActive,
-                !isVoiceNativeLinked && styles.micButtonDisabled,
+                !isVoiceLinked && styles.micButtonDisabled,
                 pressed && { opacity: 0.7 }
               ]}
             >
@@ -206,7 +214,7 @@ export default function MedicineComparison() {
             </Pressable>
           </View>
 
-          {!isVoiceNativeLinked && isVoiceSupported && (
+          {!isVoiceLinked && isVoiceSupported && (
             <Text style={styles.voiceUnavailableHint}>Voice recognition not available</Text>
           )}
           {isListening && (

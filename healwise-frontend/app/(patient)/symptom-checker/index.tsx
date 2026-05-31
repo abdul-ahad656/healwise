@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,8 +7,6 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
-  Platform,
-  NativeModules,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -18,7 +16,11 @@ import { ArrowLeft, Mic, MicOff, Search, Info } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { analyzeSymptoms } from '@/services/symptomService';
-import Voice, { SpeechResultsEvent } from '@react-native-voice/voice';
+import {
+  getVoiceModule,
+  isVoiceNativeLinked,
+  isVoicePlatformSupported,
+} from '@/services/voiceRecognition';
 import { useTranslation } from 'react-i18next';
 
 export default function SymptomChecker() {
@@ -29,16 +31,15 @@ export default function SymptomChecker() {
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const isVoiceSupported = Platform.OS === 'ios' || Platform.OS === 'android';
-  const isVoiceNativeLinked = useMemo(
-    () =>
-      isVoiceSupported &&
-      (NativeModules.RCTVoice != null || NativeModules.Voice != null),
-    [isVoiceSupported]
-  );
+  const isVoiceSupported = isVoicePlatformSupported();
+  const isVoiceLinked = isVoiceNativeLinked();
 
   useEffect(() => {
-    if (!isVoiceSupported || !isVoiceNativeLinked || !isFocused) return;
+    if (!isVoiceSupported || !isVoiceLinked || !isFocused) return;
+
+    const Voice = getVoiceModule();
+    if (!Voice) return;
+
     Voice.onSpeechStart = () => setIsListening(true);
     Voice.onSpeechEnd = () => setIsListening(false);
     Voice.onSpeechError = (e) => {
@@ -48,7 +49,7 @@ export default function SymptomChecker() {
         console.error(e);
       }
     };
-    Voice.onSpeechResults = (e: SpeechResultsEvent) => {
+    Voice.onSpeechResults = (e) => {
       if (isFocused && e.value && e.value[0]) {
         setSymptoms((prev) => prev + (prev ? " " : "") + e.value![0]);
       }
@@ -67,7 +68,7 @@ export default function SymptomChecker() {
           } catch {}
         });
     };
-  }, [isVoiceSupported, isVoiceNativeLinked, isFocused]);
+  }, [isVoiceSupported, isVoiceLinked, isFocused, t]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -84,7 +85,12 @@ export default function SymptomChecker() {
         setError("Voice input is not supported on this platform");
         return;
       }
-      if (!isVoiceNativeLinked) {
+      if (!isVoiceLinked) {
+        setError(t("voice_native_unavailable"));
+        return;
+      }
+      const Voice = getVoiceModule();
+      if (!Voice) {
         setError(t("voice_native_unavailable"));
         return;
       }
@@ -92,7 +98,7 @@ export default function SymptomChecker() {
         await Voice.stop();
       } else {
         setError(null);
-        await Voice.start('en-US'); 
+        await Voice.start('en-US');
       }
     } catch (e) {
       console.error(e);
@@ -131,7 +137,7 @@ export default function SymptomChecker() {
         end={{ x: 1, y: 0 }}
         style={styles.header}
       >
-        <SafeAreaView>
+        <SafeAreaView edges={['top']}>
           <View style={styles.headerContent}>
             <Pressable onPress={() => router.back()} hitSlop={20} style={styles.backButton}>
               <ArrowLeft size={22} color="white" />
@@ -181,7 +187,7 @@ export default function SymptomChecker() {
             </Pressable>
           </View>
 
-          {!isVoiceNativeLinked && isVoiceSupported && (
+          {!isVoiceLinked && isVoiceSupported && (
             <Text style={styles.voiceUnavailableHint}>{t("voice_native_unavailable")}</Text>
           )}
           {isListening && (
@@ -222,7 +228,6 @@ export default function SymptomChecker() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    paddingTop: Platform.OS === 'android' ? 40 : 0,
     paddingBottom: 20,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,

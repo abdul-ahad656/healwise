@@ -24,6 +24,28 @@ export interface MedicineHistoryEntry {
   createdAt?: string;
 }
 
+function normalizeMedicineHistoryEntry(raw: Record<string, unknown>): MedicineHistoryEntry {
+  const createdAt = raw.createdAt;
+  const result = (raw.result ?? {}) as Record<string, unknown>;
+  const alternatives = Array.isArray(result.alternatives) ? result.alternatives : [];
+
+  return {
+    _id: String(raw._id ?? raw.id ?? ''),
+    query: String(raw.query ?? result.input_medicine ?? ''),
+    result: {
+      input_medicine: String(result.input_medicine ?? raw.query ?? ''),
+      salt: String(result.salt ?? ''),
+      alternatives: alternatives as Medicine[],
+    },
+    createdAt:
+      typeof createdAt === 'string'
+        ? createdAt
+        : createdAt instanceof Date
+          ? createdAt.toISOString()
+          : undefined,
+  };
+}
+
 export interface MedicineTypeAwareness {
   medicine_type: string;
   description: string;
@@ -86,7 +108,9 @@ export const getMedicineHistory = async (): Promise<MedicineHistoryEntry[]> => {
       throw new Error(data.error || 'Failed to fetch medicine history');
     }
 
-    return data;
+    return Array.isArray(data)
+      ? data.map((item) => normalizeMedicineHistoryEntry(item))
+      : [];
   } catch (error: any) {
     throw new Error(error.message || 'Network error');
   }

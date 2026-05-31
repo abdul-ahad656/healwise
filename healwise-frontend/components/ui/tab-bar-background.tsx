@@ -1,5 +1,3 @@
-// This is a shim for the tab bar background
-// In a full setup with expo-blur, this would be platform-specific
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { StyleSheet, View } from 'react-native';
 

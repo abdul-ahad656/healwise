@@ -1,12 +1,3 @@
-/**
- * ConsultationRoom – Mobile (React Native)
- *
- * Uses @zegocloud/zego-uikit-prebuilt-call-rn to render a full-screen
- * one-on-one video call.  The appointmentId is used as the ZEGOCLOUD room
- * (callID) so both parties joining with the same appointmentId are routed to
- * the same call room.
- */
-
 import React, { useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import {

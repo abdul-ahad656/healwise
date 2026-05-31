@@ -68,4 +68,6 @@ class MedicineService:
         # Convert ObjectId to string for JSON serialization
         for item in history:
             item["_id"] = str(item["_id"])
+            if item.get("createdAt"):
+                item["createdAt"] = item["createdAt"].isoformat()
         return history

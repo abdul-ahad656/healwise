@@ -1,13 +1,13 @@
 import React from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  ScrollView, 
-  SafeAreaView, 
+import {
+  StyleSheet,
+  View,
+  Text,
+  ScrollView,
   Pressable,
-  Platform 
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, AlertCircle, CheckCircle2, Activity } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -33,7 +33,7 @@ export default function SymptomResult() {
   if (!result) {
     return (
       <View style={styles.container}>
-        <SafeAreaView>
+        <SafeAreaView edges={['top']}>
           <Text>No results found</Text>
           <Pressable onPress={() => router.back()}>
             <Text>Go Back</Text>
@@ -60,7 +60,7 @@ export default function SymptomResult() {
         end={{ x: 1, y: 0 }}
         style={styles.header}
       >
-        <SafeAreaView>
+        <SafeAreaView edges={['top']}>
           <View style={styles.headerContent}>
             <Pressable onPress={() => router.back()} style={styles.backButton}>
               <ArrowLeft size={22} color="white" />

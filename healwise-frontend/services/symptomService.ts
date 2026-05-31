@@ -22,6 +22,25 @@ export interface SymptomHistoryEntry {
   createdAt?: string;
 }
 
+function normalizeSymptomHistoryEntry(raw: Record<string, unknown>): SymptomHistoryEntry {
+  const createdAt = raw.createdAt;
+  return {
+    _id: String(raw._id ?? raw.id ?? ''),
+    text: String(raw.text ?? raw.symptoms ?? ''),
+    language: typeof raw.language === 'string' ? raw.language : undefined,
+    aiPrediction: String(
+      raw.aiPrediction ?? raw.prediction ?? raw.disease ?? 'Unknown'
+    ),
+    confidence: Number(raw.confidence ?? 0),
+    createdAt:
+      typeof createdAt === 'string'
+        ? createdAt
+        : createdAt instanceof Date
+          ? createdAt.toISOString()
+          : undefined,
+  };
+}
+
 export const analyzeSymptoms = async (text: string): Promise<SymptomAnalysisResult> => {
   const token = AuthStore.getToken();
 
@@ -72,7 +91,9 @@ export const getSymptomHistory = async (): Promise<SymptomHistoryEntry[]> => {
       throw new Error(data.error || 'Failed to fetch symptom history');
     }
 
-    return Array.isArray(data) ? data : [];
+    return Array.isArray(data)
+      ? data.map((item) => normalizeSymptomHistoryEntry(item))
+      : [];
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Network error';
     throw new Error(message);
