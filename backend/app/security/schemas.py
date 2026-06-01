@@ -1,6 +1,7 @@
 """Marshmallow request validation for authentication endpoints."""
 
 from marshmallow import (
+    EXCLUDE,
     Schema,
     ValidationError,
     fields,
@@ -12,19 +13,19 @@ from marshmallow import (
 from app.utils.password_validator import validate_password_strength
 
 
-class _StripUnknownMixin:
-    """Drop unexpected fields to reduce attack surface."""
+class BaseAuthSchema(Schema):
+    """Drop unexpected JSON fields to reduce attack surface."""
 
     class Meta:
-        unknown = "EXCLUDE"
+        unknown = EXCLUDE
 
 
-class LoginSchema(_StripUnknownMixin, Schema):
+class LoginSchema(BaseAuthSchema):
     email = fields.Email(required=True)
     password = fields.String(required=True, validate=validate.Length(min=1, max=256))
 
 
-class RegisterSchema(_StripUnknownMixin, Schema):
+class RegisterSchema(BaseAuthSchema):
     name = fields.String(required=True, validate=validate.Length(min=1, max=120))
     email = fields.Email(required=True)
     password = fields.String(required=True, validate=validate.Length(min=8, max=256))
@@ -39,7 +40,7 @@ class RegisterSchema(_StripUnknownMixin, Schema):
             raise ValidationError(message, "password")
 
 
-class ResetPasswordSchema(_StripUnknownMixin, Schema):
+class ResetPasswordSchema(BaseAuthSchema):
     email = fields.Email(required=True)
     password = fields.String(required=True, validate=validate.Length(min=8, max=256))
     verification_token = fields.String(required=True, validate=validate.Length(min=10, max=4096))
@@ -51,7 +52,7 @@ class ResetPasswordSchema(_StripUnknownMixin, Schema):
             raise ValidationError(message, "password")
 
 
-class SendOtpSchema(_StripUnknownMixin, Schema):
+class SendOtpSchema(BaseAuthSchema):
     email = fields.Email(required=True)
     purpose = fields.String(
         load_default="register",
@@ -59,12 +60,12 @@ class SendOtpSchema(_StripUnknownMixin, Schema):
     )
 
 
-class VerifyOtpSchema(_StripUnknownMixin, Schema):
+class VerifyOtpSchema(BaseAuthSchema):
     email = fields.Email(required=True)
     otp = fields.String(required=True, validate=validate.Regexp(r"^\d{6}$", error="OTP must be 6 digits"))
 
 
-class LanguageSchema(_StripUnknownMixin, Schema):
+class LanguageSchema(BaseAuthSchema):
     language = fields.String(required=True, validate=validate.OneOf(["en", "ur"]))
 
     @pre_load
