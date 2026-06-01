@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StripeProvider } from '@stripe/stripe-react-native';
@@ -21,6 +22,8 @@ export default function RootLayout() {
   const publishableKey = Constants.expoConfig?.extra?.stripePublishableKey || '';
 
   useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+
     const user = AuthStore.getUser();
     if (user?.language === 'ur' || user?.language === 'en') {
       i18n.changeLanguage(user.language);

@@ -1,59 +1,41 @@
-import React from "react";
-import { StyleSheet, View, Text, Pressable, Dimensions } from "react-native";
-import { useRouter } from "expo-router";
-import { Heart, Shield, Sparkles } from "lucide-react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { StyleSheet, View, Text, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Sparkles } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get("window");
+import { AppBrandIcon } from '@/components/AppBrandIcon';
+import { APP_NAME } from '@/constants/branding';
 
 export default function SplashScreen() {
   const router = useRouter();
 
   const handleContinue = () => {
-    // Navigate to the login screen inside the (auth) group
-    router.push("/(auth)/login");
+    router.push('/(auth)/login');
   };
 
   return (
     <View style={styles.container}>
-      {/* Background Gradient */}
       <LinearGradient
-        colors={["#f0fdf4", "#ffffff", "#eff6ff"]}
+        colors={['#f0fdf4', '#ffffff', '#eff6ff']}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Decorative circles */}
-      <View style={[styles.circle, { top: 40, left: 40, backgroundColor: "#bbf7d0", width: 80, height: 80 }]} />
-      <View style={[styles.circle, { top: 120, right: 30, backgroundColor: "#bfdbfe", width: 60, height: 60 }]} />
-      <View style={[styles.circle, { bottom: 200, left: 20, backgroundColor: "#86efac", width: 50, height: 50 }]} />
-      <View style={[styles.circle, { bottom: 100, right: 50, backgroundColor: "#93c5fd", width: 90, height: 90 }]} />
+      <View style={[styles.circle, styles.circleTopLeft]} />
+      <View style={[styles.circle, styles.circleTopRight]} />
+      <View style={[styles.circle, styles.circleBottomLeft]} />
+      <View style={[styles.circle, styles.circleBottomRight]} />
 
       <SafeAreaView style={styles.content}>
         <View style={styles.logoWrapper}>
-          {/* Main Logo */}
           <View style={styles.logoContainer}>
-            <LinearGradient
-              colors={["#22c55e", "#3b82f6"]}
-              style={styles.logoGradient}
-            >
-              <Heart size={64} color="white" fill="white" />
-            </LinearGradient>
-
-            {/* Floating badges */}
-            <View style={styles.badgeTop}>
-              <Sparkles size={16} color="white" />
-            </View>
-            <View style={styles.badgeBottom}>
-              <Shield size={16} color="white" />
-            </View>
+            <AppBrandIcon size={128} style={styles.logoImage} />
           </View>
 
-          {/* App Name */}
           <View style={styles.textContainer}>
-            <Text style={styles.title}>HealWise</Text>
+            <Text style={styles.title}>{APP_NAME}</Text>
             <LinearGradient
-              colors={["#22c55e", "#3b82f6"]}
+              colors={['#22c55e', '#3b82f6']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.underline}
@@ -63,12 +45,11 @@ export default function SplashScreen() {
           </View>
         </View>
 
-        {/* Bottom section */}
         <View style={styles.buttonContainer}>
           <Pressable onPress={handleContinue}>
-            {({ pressed }: { pressed: boolean }) => (
+            {({ pressed }) => (
               <LinearGradient
-                colors={pressed ? ["#16a34a", "#2563eb"] : ["#22c55e", "#3b82f6"]}
+                colors={pressed ? ['#16a34a', '#2563eb'] : ['#22c55e', '#3b82f6']}
                 style={styles.button}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
@@ -89,69 +70,67 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   circle: {
-    position: "absolute",
+    position: 'absolute',
     borderRadius: 999,
     opacity: 0.2,
+  },
+  circleTopLeft: {
+    top: 40,
+    left: 40,
+    backgroundColor: '#bbf7d0',
+    width: 80,
+    height: 80,
+  },
+  circleTopRight: {
+    top: 120,
+    right: 30,
+    backgroundColor: '#bfdbfe',
+    width: 60,
+    height: 60,
+  },
+  circleBottomLeft: {
+    bottom: 200,
+    left: 20,
+    backgroundColor: '#86efac',
+    width: 50,
+    height: 50,
+  },
+  circleBottomRight: {
+    bottom: 100,
+    right: 50,
+    backgroundColor: '#93c5fd',
+    width: 90,
+    height: 90,
   },
   content: {
     flex: 1,
     padding: 32,
-    justifyContent: "space-between",
+    justifyContent: 'space-between',
   },
   logoWrapper: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoContainer: {
-    position: "relative",
     marginBottom: 32,
-  },
-  logoGradient: {
-    width: 128,
-    height: 128,
-    borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    // Shadow for iOS
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 15,
-    // Elevation for Android
     elevation: 10,
   },
-  badgeTop: {
-    position: "absolute",
-    top: -12,
-    right: -12,
-    width: 32,
-    height: 32,
-    backgroundColor: "#facc15",
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 5,
-  },
-  badgeBottom: {
-    position: "absolute",
-    bottom: -8,
-    left: -8,
-    width: 28,
-    height: 28,
-    backgroundColor: "#4ade80",
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 5,
+  logoImage: {
+    borderWidth: 3,
+    borderColor: '#ffffff',
   },
   textContainer: {
-    alignItems: "center",
+    alignItems: 'center',
   },
   title: {
     fontSize: 40,
-    fontWeight: "bold",
-    color: "#1f2937",
+    fontWeight: 'bold',
+    color: '#1f2937',
     marginBottom: 12,
   },
   underline: {
@@ -162,35 +141,35 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 20,
-    color: "#4b5563",
-    textAlign: "center",
+    color: '#4b5563',
+    textAlign: 'center',
     marginBottom: 8,
   },
   subtitleUrdu: {
     fontSize: 18,
-    color: "#6b7280",
-    textAlign: "center",
+    color: '#6b7280',
+    textAlign: 'center',
   },
   buttonContainer: {
-    width: "100%",
+    width: '100%',
     paddingBottom: 20,
   },
   button: {
-    flexDirection: "row",
+    flexDirection: 'row',
     height: 60,
     borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 10,
     elevation: 5,
-    shadowColor: "#3b82f6",
+    shadowColor: '#3b82f6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
   buttonText: {
-    color: "white",
+    color: 'white',
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
   },
 });
