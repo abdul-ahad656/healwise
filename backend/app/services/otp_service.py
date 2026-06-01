@@ -82,8 +82,11 @@ def send_otp(email, purpose="register"):
         if find_user_by_email(email):
             return {"error": "Email already registered"}, 400
     elif purpose == "reset_password":
+        # Do not reveal whether the email is registered
         if not find_user_by_email(email):
-            return {"error": "No account found with this email"}, 404
+            return {
+                "message": "If an account exists for this email, an OTP has been sent.",
+            }, 200
     else:
         return {"error": "Invalid OTP purpose"}, 400
 
@@ -127,10 +130,10 @@ def send_otp(email, purpose="register"):
             "message": "OTP sent successfully",
             "email": email
         }, 200
-    except Exception as e:
-        # Delete OTP record if email sending fails
+    except Exception:
         mongo.db.otps.delete_one({"email": email})
-        return {"error": str(e)}, 500
+        current_app.logger.exception("otp_email_send_failed")
+        return {"error": "Unable to send OTP. Please try again later."}, 500
 
 
 def verify_otp(email, otp):

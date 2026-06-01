@@ -1,9 +1,11 @@
+import logging
 import os
 import sys
+
 from flask import Flask, jsonify
 from flask_cors import CORS
-from .extensions import mongo, jwt, mail
 
+from .extensions import mongo, jwt, mail
 from .routes.auth_routes import auth_bp
 from .routes.symptom_routes import symptom_bp
 from .routes.medicine_routes import medicine_bp
@@ -20,16 +22,29 @@ from .routes.predict_routes import predict_bp
 from .routes.payment_routes import payment_bp
 
 from .config import Config
+from .security.error_handlers import register_error_handlers
+from .security.jwt_handlers import register_jwt_handlers
+from .security.limiter import init_limiter
+from .security.talisman_config import init_talisman
+
+
+def _configure_logging(app: Flask) -> None:
+    level = logging.DEBUG if app.config.get("DEBUG") else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        stream=sys.stdout,
+        force=True,
+    )
+    logging.getLogger("healwise.security").setLevel(logging.INFO)
 
 
 def create_app():
     app = Flask(__name__, instance_relative_config=False)
 
-    # ✅ HF branch: validate config early
     Config.validate_required()
-
-    # Load configuration
     app.config.from_object(Config)
+    _configure_logging(app)
 
     if Config.OTP_DEV_MODE:
         print("📧 OTP: DEV MODE — codes printed to server console")
@@ -38,17 +53,26 @@ def create_app():
     else:
         print("⚠️ OTP: Set GMAIL_USER and GMAIL_APP_PASSWORD in .env")
 
-    # Debug logs
-    print(f"✅ Flask Environment: {os.getenv('FLASK_ENV', 'production')}")
-    print(
-        f"✅ MongoDB URI: {Config.MONGO_URI[:50]}..."
-        if Config.MONGO_URI else "❌ MONGO_URI is None"
-    )
+    print(f"✅ Flask Environment: {app.config.get('FLASK_ENV', 'production')}")
+    if Config.MONGO_URI:
+        print(f"✅ MongoDB URI: {Config.MONGO_URI[:50]}...")
+    else:
+        print("❌ MONGO_URI is None")
 
-    # Enable CORS
-    CORS(app)
+    # Rate limiting (must init before blueprints that use @limiter)
+    init_limiter(app)
+    print("✅ Flask-Limiter initialized")
 
-    # MongoDB initialization
+    # Security headers (HTTPS only in production)
+    init_talisman(app)
+    print("✅ Flask-Talisman initialized")
+
+    # CORS — optional allowlist via CORS_ORIGINS env
+    if Config.CORS_ORIGINS:
+        CORS(app, origins=Config.CORS_ORIGINS, supports_credentials=True)
+    else:
+        CORS(app)
+
     try:
         print("🔗 Initializing MongoDB connection...")
         mongo.init_app(app)
@@ -57,15 +81,14 @@ def create_app():
         print(f"❌ MongoDB initialization failed: {e}")
         raise
 
-    # JWT initialization
     try:
         print("🔐 Initializing JWT...")
         jwt.init_app(app)
+        register_jwt_handlers(app)
         print("✅ JWT initialized successfully")
     except Exception as e:
         print(f"⚠️ JWT initialization warning: {e}")
 
-    # Flask-Mail initialization
     try:
         print("📧 Initializing Flask-Mail...")
         mail.init_app(app)
@@ -73,7 +96,8 @@ def create_app():
     except Exception as e:
         print(f"⚠️ Flask-Mail initialization warning: {e}")
 
-    # Register blueprints
+    register_error_handlers(app)
+
     print("📦 Registering blueprints...")
     try:
         app.register_blueprint(auth_bp, url_prefix="/api/auth")
@@ -89,42 +113,32 @@ def create_app():
         app.register_blueprint(medicine_type_bp, url_prefix="/api/medicine-awareness")
         app.register_blueprint(prescription_bp, url_prefix="/api/prescriptions")
         app.register_blueprint(payment_bp, url_prefix="/api/payments")
-
-        # HF branch addition
         app.register_blueprint(predict_bp)
-
         print("✅ Blueprints registered successfully")
-
     except Exception as e:
         print(f"❌ Blueprint registration failed: {e}")
         raise
 
-    # HF branch: ensure DB indexes (best effort)
     with app.app_context():
         try:
             from app.services.symptom_service import ensure_patients_indexes
+
             if mongo.db is not None:
                 ensure_patients_indexes()
         except Exception as e:
             print(f"⚠️ patients index warning: {e}")
 
-    # Health check endpoint
     @app.route("/health")
     def health():
         try:
             if mongo.db is not None:
-                mongo.db.command('ping')
+                mongo.db.command("ping")
                 return jsonify({"status": "ok", "mongodb": "connected"}), 200
-        except Exception as e:
-            return jsonify({"status": "degraded", "error": str(e)}), 503
+        except Exception:
+            app.logger.exception("health_check_mongodb_failed")
+            return jsonify({"status": "degraded", "error": "Database unavailable"}), 503
 
         return jsonify({"status": "ok"}), 200
-
-    # Error handler
-    @app.errorhandler(500)
-    def server_error(e):
-        print(f"❌ Server error: {e}")
-        return jsonify({"error": "Internal server error"}), 500
 
     print("✅ Flask app created successfully!")
     return app

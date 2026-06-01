@@ -1,20 +1,21 @@
-from flask import request
+from flask import jsonify
+
 from app.services.otp_service import send_otp, verify_otp
+from app.utils.request_validation import validate_json
+from app.security.schemas import SendOtpSchema, VerifyOtpSchema, normalize_email_in_data
 
 
-def send_otp_handler():
+@validate_json(SendOtpSchema())
+def send_otp_handler(data):
     """POST /api/auth/send-otp - Send OTP to email."""
-    data = request.json or {}
-    email = data.get("email")
-    purpose = data.get("purpose", "register")
-
-    return send_otp(email, purpose)
+    data = normalize_email_in_data(data)
+    result, status = send_otp(data["email"], data.get("purpose", "register"))
+    return jsonify(result), status
 
 
-def verify_otp_handler():
+@validate_json(VerifyOtpSchema())
+def verify_otp_handler(data):
     """POST /api/auth/verify-otp - Verify OTP and return temp token."""
-    data = request.json or {}
-    email = data.get("email")
-    otp = data.get("otp")
-
-    return verify_otp(email, otp)
+    data = normalize_email_in_data(data)
+    result, status = verify_otp(data["email"], data["otp"])
+    return jsonify(result), status

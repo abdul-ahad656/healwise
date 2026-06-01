@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import timedelta
 
 from dotenv import load_dotenv
 
@@ -13,7 +14,17 @@ class Config:
 
     SECRET_KEY = os.getenv("SECRET_KEY")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-    FLASK_ENV = os.getenv("FLASK_ENV")
+    FLASK_ENV = os.getenv("FLASK_ENV", "production")
+    IS_PRODUCTION = FLASK_ENV == "production"
+    DEBUG = os.getenv("FLASK_DEBUG", "").lower() in ("1", "true", "yes") or (
+        FLASK_ENV == "development"
+    )
+
+    # JWT — short-lived access tokens
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=30)
+    JWT_TOKEN_LOCATION = ["headers"]
+    JWT_HEADER_NAME = "Authorization"
+    JWT_HEADER_TYPE = "Bearer"
 
     MONGO_URI = os.getenv("MONGO_URI")
 
@@ -53,6 +64,16 @@ class Config:
     EASYPAISA_RECEIVER_NUMBER = "03144828190"
     SUPPORTED_PAYMENT_METHODS = ["stripe", "easypaisa"]
 
+    # Optional CORS allowlist (comma-separated). Empty = permissive for dev.
+    CORS_ORIGINS = [
+        o.strip()
+        for o in os.getenv("CORS_ORIGINS", "").split(",")
+        if o.strip()
+    ]
+
+    # Flask-Limiter storage (use Redis in multi-instance Cloud Run deployments)
+    RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
+
     JSON_SORT_KEYS = False
     PROPAGATE_EXCEPTIONS = True
 
@@ -69,4 +90,22 @@ class Config:
             sys.exit(1)
 
         if not cls.HF_SPACE_URL:
-            print("WARNING: HF_SPACE_URL is not set. Symptom prediction will fail until configured.")
+            print(
+                "WARNING: HF_SPACE_URL is not set. "
+                "Symptom prediction will fail until configured."
+            )
+
+        if cls.IS_PRODUCTION:
+            missing = []
+            if not cls.SECRET_KEY:
+                missing.append("SECRET_KEY")
+            if not cls.JWT_SECRET_KEY:
+                missing.append("JWT_SECRET_KEY")
+            if missing:
+                print(
+                    "ERROR: Production requires these environment variables: "
+                    + ", ".join(missing)
+                )
+                sys.exit(1)
+            if cls.DEBUG:
+                print("WARNING: DEBUG is enabled in production — disable FLASK_DEBUG.")
