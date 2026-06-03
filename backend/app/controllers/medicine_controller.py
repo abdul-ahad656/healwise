@@ -4,19 +4,23 @@ from flask import request, jsonify
 from flask_jwt_extended import get_jwt_identity
 from app.services.medicine_service import MedicineService
 
+
 class MedicineController:
 
     @staticmethod
     def compare_medicines():
         user_id = get_jwt_identity()
-        data = request.get_json()
+        data = request.get_json() or {}
 
-        query = data.get("name") or data.get("salt")
+        name = (data.get("name") or "").strip()
+        strength = (data.get("strength") or data.get("potency") or "").strip()
 
-        if not query:
-            return jsonify({"error": "Medicine name or salt is required"}), 400
+        if not name or not strength:
+            return jsonify({
+                "error": "Medicine name and strength (potency) are required."
+            }), 400
 
-        result, status = MedicineService.compare_medicines(query, user_id)
+        result, status = MedicineService.compare_medicines(name, strength, user_id)
         return jsonify(result), status
 
     @staticmethod

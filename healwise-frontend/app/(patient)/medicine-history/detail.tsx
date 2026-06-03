@@ -124,11 +124,15 @@ export default function MedicineHistoryDetailScreen() {
 
   const result = entry.result ?? {
     input_medicine: entry.query,
+    input_strength: undefined,
     salt: '',
     alternatives: [],
   };
   const medicineName =
-    entry.query || result.input_medicine || 'Medicine comparison';
+    result.input_medicine || entry.query || 'Medicine comparison';
+  const strengthLabel =
+    result.input_strength ||
+    (entry as { strength?: string }).strength;
 
   return (
     <View style={s.container}>
@@ -152,6 +156,9 @@ export default function MedicineHistoryDetailScreen() {
             <Text style={styles.saltLabel}>Active salt</Text>
           </View>
           <Text style={styles.saltName}>{result.salt}</Text>
+          {strengthLabel ? (
+            <Text style={styles.strengthHint}>Compared at: {strengthLabel}</Text>
+          ) : null}
         </View>
 
         <View style={styles.listHeader}>
@@ -235,6 +242,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#075985',
+  },
+  strengthHint: {
+    fontSize: 13,
+    color: '#0369a1',
+    marginTop: 6,
+    fontWeight: '600',
   },
   listHeader: {
     flexDirection: 'row',

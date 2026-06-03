@@ -28,6 +28,7 @@ export default function MedicineComparison() {
   const router = useRouter();
   const isFocused = useIsFocused();
   const [searchTerm, setSearchTerm] = useState('');
+  const [strength, setStrength] = useState('');
   const [results, setResults] = useState<CompareResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +84,7 @@ export default function MedicineComparison() {
     React.useCallback(() => {
       return () => {
         setSearchTerm('');
+        setStrength('');
         setResults(null);
         setError(null);
       };
@@ -132,24 +134,34 @@ export default function MedicineComparison() {
   };
 
   const handleSearch = async () => {
-    if (!searchTerm.trim()) return;
+    const name = searchTerm.trim();
+    const potency = strength.trim();
+
+    if (!name || !potency) {
+      setError(t('medicine_strength_required'));
+      return;
+    }
 
     setLoading(true);
     setResults(null);
     setError(null);
     try {
-      const data = await compareMedicines(searchTerm);
+      const data = await compareMedicines(name, potency);
       setResults(data);
     } catch (error: any) {
-      if (error.message.includes("not found")) {
-        setError("No medicine found / کوئی دوا نہیں ملی");
+      if (error.message.includes('not found') || error.message.includes('required')) {
+        setError(error.message.includes('required')
+          ? t('medicine_strength_required')
+          : t('medicine_no_medicine_found'));
       } else {
-        Alert.alert("Error", error.message);
+        Alert.alert('Error', error.message);
       }
     } finally {
       setLoading(false);
     }
   };
+
+  const canSearch = searchTerm.trim().length > 0 && strength.trim().length > 0;
 
   return (
     <View style={styles.container}>
@@ -214,6 +226,19 @@ export default function MedicineComparison() {
             </Pressable>
           </View>
 
+          <View style={styles.inputWrapper}>
+            <TextInput
+              placeholder={t('medicine_strength_placeholder')}
+              placeholderTextColor="#9CA3AF"
+              value={strength}
+              onChangeText={setStrength}
+              style={styles.input}
+              editable={!loading}
+              autoCapitalize="none"
+              keyboardType="default"
+            />
+          </View>
+
           {!isVoiceLinked && isVoiceSupported && (
             <Text style={styles.voiceUnavailableHint}>Voice recognition not available</Text>
           )}
@@ -223,10 +248,10 @@ export default function MedicineComparison() {
 
           <Pressable
             onPress={handleSearch}
-            disabled={!searchTerm.trim() || loading}
+            disabled={!canSearch || loading}
             style={({ pressed }: { pressed: boolean }) => [
               styles.buttonWrapper,
-              (!searchTerm.trim() || loading) && { opacity: 0.5 },
+              (!canSearch || loading) && { opacity: 0.5 },
               pressed && { opacity: 0.9 }
             ]}
           >
@@ -261,6 +286,11 @@ export default function MedicineComparison() {
                 <Text style={styles.saltLabel}>{t("medicine_active_salt")}</Text>
               </View>
               <Text style={styles.saltName}>{results.salt}</Text>
+              {(results.input_strength || strength) && (
+                <Text style={styles.strengthHint}>
+                  {t("medicine_searched_strength")}: {results.input_strength || strength}
+                </Text>
+              )}
             </View>
 
             <View style={styles.listHeader}>
@@ -406,6 +436,12 @@ const styles = StyleSheet.create({
   saltHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   saltLabel: { fontSize: 12, color: '#0369a1', fontWeight: '600' },
   saltName: { fontSize: 16, fontWeight: '700', color: '#075985' },
+  strengthHint: {
+    fontSize: 13,
+    color: '#0369a1',
+    marginTop: 6,
+    fontWeight: '600',
+  },
   listHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   listTitle: { fontSize: 18, fontWeight: '700', color: '#1f2937' },
   medCard: {

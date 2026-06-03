@@ -13,6 +13,8 @@ export interface Medicine {
 
 export interface CompareResult {
   input_medicine: string;
+  input_strength?: string;
+  normalized_strength?: string;
   salt: string;
   alternatives: Medicine[];
 }
@@ -34,6 +36,12 @@ function normalizeMedicineHistoryEntry(raw: Record<string, unknown>): MedicineHi
     query: String(raw.query ?? result.input_medicine ?? ''),
     result: {
       input_medicine: String(result.input_medicine ?? raw.query ?? ''),
+      input_strength: result.input_strength
+        ? String(result.input_strength)
+        : undefined,
+      normalized_strength: result.normalized_strength
+        ? String(result.normalized_strength)
+        : undefined,
       salt: String(result.salt ?? ''),
       alternatives: alternatives as Medicine[],
     },
@@ -58,11 +66,21 @@ export interface MedicineTypeAwareness {
   disclaimer: string;
 }
 
-export const compareMedicines = async (query: string): Promise<CompareResult> => {
+export const compareMedicines = async (
+  name: string,
+  strength: string
+): Promise<CompareResult> => {
   const token = AuthStore.getToken();
 
   if (!token) {
     throw new Error('User not authenticated');
+  }
+
+  const trimmedName = name.trim();
+  const trimmedStrength = strength.trim();
+
+  if (!trimmedName || !trimmedStrength) {
+    throw new Error('Medicine name and strength are required');
   }
 
   try {
@@ -72,7 +90,7 @@ export const compareMedicines = async (query: string): Promise<CompareResult> =>
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ name: query }),
+      body: JSON.stringify({ name: trimmedName, strength: trimmedStrength }),
     });
 
     const data = await response.json();

@@ -2,39 +2,46 @@
 
 from app.models.medicine_model import MedicineModel
 from app.models.medicine_history_model import MedicineHistoryModel
+from app.utils.medicine_strength import normalize_strength
+
 
 class MedicineService:
 
     @staticmethod
-    def compare_medicines(query, user_id=None):
+    def compare_medicines(name, strength, user_id=None):
+        name = (name or "").strip()
+        strength = (strength or "").strip()
 
-        salt = None
-        alternatives = []
+        if not name or not strength:
+            return {"error": "Medicine name and strength (potency) are required."}, 400
 
-        # Step 1: Try to find by name
-        med = MedicineModel.get_by_name(query)
+        med = MedicineModel.get_by_name_and_strength(name, strength)
 
-        if med:
-            salt = med.get("salt")
-            if not salt:
-                return {"error": "Salt not found for this medicine."}, 400
-            # Step 2: Find all medicines with same salt
-            alternatives = MedicineModel.get_by_salt(salt)
-        else:
-            # Step 1b: If not found by name, check if input is a salt
-            alternatives = MedicineModel.get_by_salt(query)
-            if alternatives:
-                salt = query
-            else:
-                return {"error": f"Medicine or Salt '{query}' not found."}, 404
+        if not med:
+            return {
+                "error": (
+                    f"No medicine found for '{name}' at strength '{strength}'. "
+                    "Check the name and potency (e.g. 50mg)."
+                )
+            }, 404
 
-        # Step 3: Sort by price (ascending)
+        salt = med.get("salt")
+        if not salt:
+            return {"error": "Salt not found for this medicine."}, 400
+
+        alternatives = MedicineModel.get_by_salt_and_strength(salt, strength)
+
+        if not alternatives:
+            return {
+                "error": (
+                    f"No alternatives found for salt '{salt}' at strength '{strength}'."
+                )
+            }, 404
+
         alternatives_sorted = sorted(alternatives, key=lambda x: x.get("price", 999999))
-
-        # Step 3b: Keep only top 3 cheapest
         top_3_alternatives = alternatives_sorted[:3]
 
-        # Step 4: Build clean output
+        normalized_strength = normalize_strength(strength)
         output = []
         for item in top_3_alternatives:
             output.append({
@@ -46,17 +53,20 @@ class MedicineService:
             })
 
         result_data = {
-            "input_medicine": query,
+            "input_medicine": name,
+            "input_strength": strength,
+            "normalized_strength": normalized_strength,
             "salt": salt,
-            "alternatives": output
+            "alternatives": output,
         }
 
-        # Step 5: Save history if user_id is provided
         if user_id:
             history_record = {
                 "userId": user_id,
-                "query": query,
-                "result": result_data
+                "query": f"{name} ({strength})",
+                "name": name,
+                "strength": strength,
+                "result": result_data,
             }
             MedicineHistoryModel.create_history(history_record)
 
@@ -65,7 +75,6 @@ class MedicineService:
     @staticmethod
     def get_history(user_id):
         history = MedicineHistoryModel.get_user_history(user_id)
-        # Convert ObjectId to string for JSON serialization
         for item in history:
             item["_id"] = str(item["_id"])
             if item.get("createdAt"):
