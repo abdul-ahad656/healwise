@@ -6,3 +6,6 @@ build
 android
 ios
 *.log
+
+android/**/build
+**/build

@@ -1,9 +1,5 @@
-import React, { useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import {
-  ZegoUIKitPrebuiltCall,
-  ONE_ON_ONE_VIDEO_CALL_CONFIG,
-} from '@zegocloud/zego-uikit-prebuilt-call-rn';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { PhoneOff } from 'lucide-react-native';
 import { useZegoConfig } from '@/hooks/useZegoConfig';
 
@@ -15,6 +11,8 @@ export interface ConsultationRoomProps {
   onLeave?: () => void;
 }
 
+type ZegoCallModule = typeof import('@zegocloud/zego-uikit-prebuilt-call-rn');
+
 export default function ConsultationRoom({
   appointmentId,
   userID,
@@ -22,10 +20,30 @@ export default function ConsultationRoom({
   onLeave,
 }: ConsultationRoomProps) {
   const { appID, appSign, error } = useZegoConfig();
+  const [zego, setZego] = useState<ZegoCallModule | null>(null);
+  const [zegoLoadError, setZegoLoadError] = useState<string | null>(null);
   const callRef = useRef<{ hangUp?: (showConfirmation?: boolean) => void } | null>(
     null
   );
   const hasLeftRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    import('@zegocloud/zego-uikit-prebuilt-call-rn')
+      .then((mod) => {
+        if (!cancelled) setZego(mod);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setZegoLoadError(
+            err instanceof Error ? err.message : 'Failed to load video call SDK'
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const finishCall = useCallback(() => {
     if (hasLeftRef.current) return;
@@ -42,18 +60,25 @@ export default function ConsultationRoom({
     finishCall();
   }, [finishCall]);
 
-  if (error) {
+  if (error || zegoLoadError) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorTitle}>Configuration Error</Text>
-        <Text style={styles.errorBody}>{error}</Text>
+        <Text style={styles.errorBody}>{error ?? zegoLoadError}</Text>
       </View>
     );
   }
 
-  if (appID === null) {
-    return null;
+  if (appID === null || !zego) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#22c55e" />
+        <Text style={styles.loadingText}>Connecting video call…</Text>
+      </View>
+    );
   }
+
+  const { ZegoUIKitPrebuiltCall, ONE_ON_ONE_VIDEO_CALL_CONFIG } = zego;
 
   return (
     <View style={styles.container}>
@@ -91,6 +116,17 @@ export default function ConsultationRoom({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#0f172a',
+  },
+  loadingText: {
+    color: '#e2e8f0',
+    fontSize: 14,
+  },
   endCallButton: {
     position: 'absolute',
     top: 52,
