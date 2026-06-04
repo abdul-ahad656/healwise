@@ -1,8 +1,11 @@
 import { Tabs } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import { FileText, Calendar } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 export default function PatientLayout() {
+  const { t } = useTranslation();
+
   return (
     <Tabs
       screenOptions={{
@@ -14,7 +17,7 @@ export default function PatientLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Home',
+          title: t('tab_home'),
           tabBarIcon: ({ color, size }) => (
             <FontAwesome name="home" color={color} size={size} />
           ),
@@ -23,7 +26,7 @@ export default function PatientLayout() {
       <Tabs.Screen
         name="prescriptions"
         options={{
-          title: 'Prescriptions',
+          title: t('tab_prescriptions'),
           tabBarIcon: ({ color, size }) => (
             <FileText color={color} size={size} />
           ),
@@ -32,7 +35,7 @@ export default function PatientLayout() {
       <Tabs.Screen
         name="appointments"
         options={{
-          title: 'Appointments',
+          title: t('tab_appointments'),
           tabBarIcon: ({ color, size }) => (
             <Calendar color={color} size={size} />
           ),
@@ -41,7 +44,7 @@ export default function PatientLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: t('tab_profile'),
           tabBarIcon: ({ color, size }) => (
             <FontAwesome name="user" color={color} size={size} />
           ),
@@ -64,6 +67,7 @@ export default function PatientLayout() {
       <Tabs.Screen name="symptom-history/detail" options={{ href: null }} />
       <Tabs.Screen name="medicine-history/index" options={{ href: null }} />
       <Tabs.Screen name="medicine-history/detail" options={{ href: null }} />
+      <Tabs.Screen name="appointment-history/index" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -8,7 +8,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { Thermometer, Pill, ChevronRight } from 'lucide-react-native';
+import { Thermometer, Pill, Calendar, ChevronRight } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import { PatientPrimaryButton } from '@/components/patient/PatientPrimaryButton';
 import { patientScreenStyles as s } from '@/styles/patientScreen';
@@ -19,6 +20,7 @@ type Lang = 'en' | 'ur';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const user = AuthStore.getUser();
 
   const initialLang: Lang = (user?.language === 'ur' ? 'ur' : 'en') as Lang;
@@ -51,7 +53,11 @@ export default function ProfileScreen() {
     <View style={s.container}>
       <View style={[StyleSheet.absoluteFill, s.pageBg]} />
 
-      <PatientScreenHeader title="Profile" subtitle="Account & activity history" />
+      <PatientScreenHeader
+        title="Profile"
+        subtitle="Account & activity history"
+        onBack={() => router.navigate('/(patient)/home' as Href)}
+      />
 
       <ScrollView
         style={s.scroll}
@@ -144,6 +150,29 @@ export default function ProfileScreen() {
             </Text>
             <Text style={styles.menuSubtitle} numberOfLines={2}>
               View past medicine comparisons
+            </Text>
+          </View>
+          <View style={styles.chevronWrap}>
+            <ChevronRight size={20} color="#9ca3af" />
+          </View>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/(patient)/appointment-history' as Href)}
+          style={({ pressed }) => [
+            styles.menuRow,
+            { opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          <View style={[styles.menuIcon, { backgroundColor: '#ecfeff' }]}>
+            <Calendar size={22} color="#0891b2" />
+          </View>
+          <View style={styles.menuText}>
+            <Text style={styles.menuTitle} numberOfLines={1}>
+              {t('profile_appointment_history_title')}
+            </Text>
+            <Text style={styles.menuSubtitle} numberOfLines={2}>
+              {t('profile_appointment_history_subtitle')}
             </Text>
           </View>
           <View style={styles.chevronWrap}>

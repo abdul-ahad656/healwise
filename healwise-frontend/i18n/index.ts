@@ -1,6 +1,5 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { I18nManager } from 'react-native';
 
 const resources = {
   en: {
@@ -181,7 +180,69 @@ const resources = {
       home_doctor_subtitle: "ڈاکٹر سے مشورہ",
       home_doctor_desc: "Talk to qualified doctors",
       home_stat_available: "Available",
-      home_stat_doctors: "Doctors"
+      home_stat_doctors: "Doctors",
+
+      tab_home: "Home",
+      tab_prescriptions: "Prescriptions",
+      tab_appointments: "Appointments",
+      tab_profile: "Profile",
+
+      prescriptions_title: "My Prescriptions",
+      prescriptions_subtitle: "View prescriptions from your doctors",
+      prescriptions_loading: "Loading prescriptions…",
+      prescriptions_empty_title: "No Prescriptions Yet",
+      prescriptions_empty_text:
+        "Your prescriptions from doctors will appear here once they upload them.",
+      prescriptions_doctor_fallback: "Doctor",
+      prescriptions_appointment_label: "Appointment",
+      prescriptions_uploaded_label: "Uploaded",
+      prescriptions_notes_label: "Doctor's notes",
+      prescriptions_view_download: "View / Download",
+      prescriptions_error_load: "Failed to load prescriptions",
+      prescriptions_error_open: "Failed to open prescription",
+
+      appointments_title: "My Appointments",
+      appointments_subtitle: "Manage your doctor consultations",
+      appointments_loading: "Loading appointments…",
+      appointments_error_load: "Failed to load appointments",
+      appointments_retry: "Retry",
+      appointments_empty_title: "No Appointments Yet",
+      appointments_empty_text:
+        "Your appointments with doctors will appear here. Book a consultation to get started.",
+      appointments_date: "Date",
+      appointments_time: "Time",
+      appointments_doctor_fallback: "Doctor",
+      appointments_join_call: "Join video call",
+      appointments_waiting_accept: "Waiting for doctor to accept",
+      appointments_cannot_join: "Cannot join this appointment",
+      appointments_cannot_join_title: "Cannot join yet",
+      appointments_error_user: "Could not determine your user ID. Please log in again.",
+      appointment_status_pending: "Pending",
+      appointment_status_accepted: "Accepted",
+      appointment_status_confirmed: "Confirmed",
+      appointment_status_in_progress: "In progress",
+      appointment_status_rejected: "Rejected",
+      appointment_status_completed: "Completed",
+      appointments_join_ended: "This consultation window has ended",
+      appointments_join_available_before:
+        "Available {{early}} minutes before start ({{minutes}} min remaining)",
+      appointments_invalid_date: "Invalid appointment date",
+      appointments_invalid_time: "Invalid appointment time",
+      appointments_pending_video: "Accept this appointment before starting a video call",
+      appointments_not_available_video:
+        "This appointment is not available for video consultation",
+
+      profile_appointment_history_title: "Appointment history",
+      profile_appointment_history_subtitle: "View past doctor consultations",
+      appointment_history_title: "Appointment history",
+      appointment_history_subtitle: "Past consultations with doctors",
+      appointment_history_loading: "Loading appointment history…",
+      appointment_history_error_load: "Failed to load appointment history",
+      appointment_history_empty_title: "No past appointments",
+      appointment_history_empty_body:
+        "Completed or past consultations will appear here after you book with a doctor.",
+      appointment_history_book_cta: "Book a consultation",
+      appointment_history_has_prescription: "Prescription available in Prescriptions tab"
     }
   },
   ur: {
@@ -371,7 +432,68 @@ const resources = {
       home_doctor_subtitle: "ڈاکٹر سے مشورہ",
       home_doctor_desc: "قابل ڈاکٹرز سے بات کریں",
       home_stat_available: "دستیاب",
-      home_stat_doctors: "ڈاکٹرز"
+      home_stat_doctors: "ڈاکٹرز",
+
+      tab_home: "ہوم",
+      tab_prescriptions: "نسخے",
+      tab_appointments: "ملاقاتیں",
+      tab_profile: "پروفائل",
+
+      prescriptions_title: "میرے نسخے",
+      prescriptions_subtitle: "اپنے ڈاکٹرز کے نسخے دیکھیں",
+      prescriptions_loading: "نسخے لوڈ ہو رہے ہیں…",
+      prescriptions_empty_title: "ابھی کوئی نسخہ نہیں",
+      prescriptions_empty_text:
+        "ڈاکٹرز کے اپ لوڈ کردہ نسخے یہاں نظر آئیں گے۔",
+      prescriptions_doctor_fallback: "ڈاکٹر",
+      prescriptions_appointment_label: "ملاقات",
+      prescriptions_uploaded_label: "اپ لوڈ کی تاریخ",
+      prescriptions_notes_label: "ڈاکٹر کے نوٹس",
+      prescriptions_view_download: "دیکھیں / ڈاؤن لوڈ",
+      prescriptions_error_load: "نسخے لوڈ نہیں ہو سکے",
+      prescriptions_error_open: "نسخہ کھولا نہیں جا سکا",
+
+      appointments_title: "میری ملاقاتیں",
+      appointments_subtitle: "ڈاکٹر سے مشاورتیں منظم کریں",
+      appointments_loading: "ملاقاتیں لوڈ ہو رہی ہیں…",
+      appointments_error_load: "ملاقاتیں لوڈ نہیں ہو سکیں",
+      appointments_retry: "دوبارہ کوشش",
+      appointments_empty_title: "ابھی کوئی ملاقات نہیں",
+      appointments_empty_text:
+        "ڈاکٹرز کے ساتھ آپ کی ملاقاتیں یہاں دکھائی دیں گی۔ مشورے کے لیے بکنگ کریں۔",
+      appointments_date: "تاریخ",
+      appointments_time: "وقت",
+      appointments_doctor_fallback: "ڈاکٹر",
+      appointments_join_call: "ویڈیو کال میں شامل ہوں",
+      appointments_waiting_accept: "ڈاکٹر کی منظوری کا انتظار",
+      appointments_cannot_join: "اس ملاقات میں شامل نہیں ہو سکتے",
+      appointments_cannot_join_title: "ابھی شامل نہیں ہو سکتے",
+      appointments_error_user: "صارف کی شناخت نہیں ملی۔ دوبارہ لاگ ان کریں۔",
+      appointment_status_pending: "زیر التواء",
+      appointment_status_accepted: "منظور",
+      appointment_status_confirmed: "تصدیق شدہ",
+      appointment_status_in_progress: "جاری",
+      appointment_status_rejected: "مسترد",
+      appointment_status_completed: "مکمل",
+      appointments_join_ended: "مشورے کا وقت ختم ہو چکا ہے",
+      appointments_join_available_before:
+        "شروع سے {{early}} منٹ پہلے دستیاب ({{minutes}} منٹ باقی)",
+      appointments_invalid_date: "ملاقات کی تاریخ درست نہیں",
+      appointments_invalid_time: "ملاقات کا وقت درست نہیں",
+      appointments_pending_video: "ویڈیو کال سے پہلے ملاقات منظور کریں",
+      appointments_not_available_video: "یہ ملاقات ویڈیو مشورے کے لیے دستیاب نہیں",
+
+      profile_appointment_history_title: "ملاقاتوں کی تاریخ",
+      profile_appointment_history_subtitle: "گزشتہ ڈاکٹر مشاورتیں دیکھیں",
+      appointment_history_title: "ملاقاتوں کی تاریخ",
+      appointment_history_subtitle: "ڈاکٹرز کے ساتھ گزشتہ مشاورتیں",
+      appointment_history_loading: "ملاقاتوں کی تاریخ لوڈ ہو رہی ہے…",
+      appointment_history_error_load: "ملاقاتوں کی تاریخ لوڈ نہیں ہو سکی",
+      appointment_history_empty_title: "کوئی گزشتہ ملاقات نہیں",
+      appointment_history_empty_body:
+        "ڈاکٹر سے بکنگ کے بعد مکمل یا گزشتہ مشاورتیں یہاں دکھائی دیں گی۔",
+      appointment_history_book_cta: "مشورہ بک کریں",
+      appointment_history_has_prescription: "نسخہ نسخے والے ٹیب میں دستیاب ہے"
     }
   }
 };

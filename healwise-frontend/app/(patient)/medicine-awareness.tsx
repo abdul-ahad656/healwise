@@ -11,11 +11,9 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-  ArrowLeft,
   Shield,
   AlertTriangle,
   CheckCircle,
@@ -32,6 +30,7 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
+import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import {
   getMedicineTypeAwareness,
   MedicineTypeAwareness,
@@ -227,28 +226,11 @@ export default function MedicineSafety() {
         style={StyleSheet.absoluteFill}
       />
 
-      <LinearGradient
+      <PatientScreenHeader
+        title={t('medicine_awareness_title')}
         colors={['#f97316', '#ef4444']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView edges={['top', 'left', 'right']}>
-          <View style={styles.headerContent}>
-            <Pressable
-              onPress={() => router.back()}
-              hitSlop={20}
-              style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.6 }]}
-            >
-              <ArrowLeft size={22} color="white" />
-            </Pressable>
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.headerTitle}>{t('medicine_awareness_title')}</Text>
-              {/* <Text style={styles.headerSubtitle}>{t('medicine_awareness_subtitle')}</Text> */}
-            </View>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+        onBack={() => router.navigate('/(patient)/home' as Href)}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -424,16 +406,6 @@ export default function MedicineSafety() {
             </View>
           ))}
         </Card>
-
-        {/* Emergency */}
-        <Card style={styles.emergencyCard}>
-          <AlertTriangle size={24} color="#b91c1c" />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.emergencyTitle}>{t('medicine_emergency_title')}</Text>
-            <Text style={styles.emergencyDesc}>{t('medicine_emergency_desc')}</Text>
-            <Text style={styles.emergencyNumber}>{t('medicine_emergency_number_label')}</Text>
-          </View>
-        </Card>
       </ScrollView>
 
       {/* Searchable type picker — bottom sheet */}
@@ -537,17 +509,6 @@ export default function MedicineSafety() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  headerContent: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  backButton: { padding: 8, marginLeft: -8, marginTop: 4 },
-  headerTextContainer: { flex: 1, justifyContent: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF' },
-  headerSubtitle: { fontSize: 14, color: '#FFFFFF', opacity: 0.9, marginTop: 2 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
 

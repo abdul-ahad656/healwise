@@ -1,6 +1,14 @@
-import { Stack } from 'expo-router';
+import { Stack, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
+import { applyEnglishLocale } from '@/utils/locale';
 
 export default function AuthLayout() {
+  useFocusEffect(
+    useCallback(() => {
+      applyEnglishLocale();
+    }, [])
+  );
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="login" />

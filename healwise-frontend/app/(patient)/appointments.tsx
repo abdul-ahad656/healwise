@@ -9,7 +9,10 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 import { Video, Calendar, Clock, User } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Card } from '@/components/ui/card';
 import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import ConsultationRoom from '@/components/VideoCall/ConsultationRoom';
@@ -17,9 +20,44 @@ import { getPatientAppointments, Appointment } from '@/services/doctorPanelServi
 import AuthStore from '@/services/authStore';
 import { patientScreenStyles as s } from '@/styles/patientScreen';
 import {
+  CONSULTATION_EARLY_MINUTES,
   canStartTeleconsult,
   isJoinableStatus,
 } from '@/utils/consultationTime';
+
+function formatAppointmentStatus(status: string, t: TFunction) {
+  const key = `appointment_status_${status}`;
+  const translated = t(key);
+  return translated === key
+    ? status.charAt(0).toUpperCase() + status.slice(1)
+    : translated;
+}
+
+function translateJoinMessage(
+  message: string,
+  minutesUntilStart: number | null,
+  t: TFunction
+) {
+  if (!message) return '';
+  if (message === 'Invalid appointment date') return t('appointments_invalid_date');
+  if (message === 'Invalid appointment time') return t('appointments_invalid_time');
+  if (message === 'This consultation window has ended') {
+    return t('appointments_join_ended');
+  }
+  if (message === 'Accept this appointment before starting a video call') {
+    return t('appointments_pending_video');
+  }
+  if (message === 'This appointment is not available for video consultation') {
+    return t('appointments_not_available_video');
+  }
+  if (message.includes('minutes before start')) {
+    return t('appointments_join_available_before', {
+      early: CONSULTATION_EARLY_MINUTES,
+      minutes: minutesUntilStart ?? 0,
+    });
+  }
+  return message;
+}
 
 interface CallState {
   appointmentId: string;
@@ -28,6 +66,8 @@ interface CallState {
 }
 
 export default function AppointmentsScreen() {
+  const router = useRouter();
+  const { t, i18n } = useTranslation();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,7 +91,7 @@ export default function AppointmentsScreen() {
       );
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : 'Failed to load appointments';
+        err instanceof Error ? err.message : t('appointments_error_load');
       setError(message);
       console.error('Error loading appointments:', err);
     } finally {
@@ -68,7 +108,7 @@ export default function AppointmentsScreen() {
   const startCall = (appointment: Appointment) => {
     const user = AuthStore.getUser();
     if (!user?.id) {
-      Alert.alert('Error', 'Could not determine your user ID. Please log in again.');
+      Alert.alert('Error', t('appointments_error_user'));
       return;
     }
 
@@ -79,7 +119,10 @@ export default function AppointmentsScreen() {
     );
 
     if (!window.canJoin) {
-      Alert.alert('Cannot join yet', window.message);
+      Alert.alert(
+        t('appointments_cannot_join_title'),
+        translateJoinMessage(window.message, window.minutesUntilStart, t)
+      );
       return;
     }
 
@@ -97,7 +140,8 @@ export default function AppointmentsScreen() {
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
+      const locale = i18n.language === 'ur' ? 'ur-PK' : 'en-US';
+      return date.toLocaleDateString(locale, {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -144,9 +188,10 @@ export default function AppointmentsScreen() {
       <View style={[StyleSheet.absoluteFill, s.pageBg]} />
 
       <PatientScreenHeader
-        title="My Appointments"
-        subtitle="Manage your doctor consultations"
+        title={t('appointments_title')}
+        subtitle={t('appointments_subtitle')}
         colors={['#06b6d4', '#22c55e']}
+        onBack={() => router.navigate('/(patient)/home' as Href)}
       />
 
       <ScrollView
@@ -160,7 +205,7 @@ export default function AppointmentsScreen() {
         {loading ? (
           <View style={local.center}>
             <ActivityIndicator size="large" color="#06b6d4" />
-            <Text style={s.infoText}>Loading appointments…</Text>
+            <Text style={s.infoText}>{t('appointments_loading')}</Text>
           </View>
         ) : error ? (
           <Card style={local.errorCard}>
@@ -170,17 +215,14 @@ export default function AppointmentsScreen() {
               onPress={loadAppointments}
               style={local.retryBtn}
             >
-              <Text style={local.retryText}>Retry</Text>
+              <Text style={local.retryText}>{t('appointments_retry')}</Text>
             </TouchableOpacity>
           </Card>
         ) : appointments.length === 0 ? (
           <Card style={local.emptyCard}>
             <Calendar size={48} color="#d1d5db" />
-            <Text style={local.emptyTitle}>No Appointments Yet</Text>
-            <Text style={local.emptyText}>
-              Your appointments with doctors will appear here. Book a consultation to
-              get started.
-            </Text>
+            <Text style={local.emptyTitle}>{t('appointments_empty_title')}</Text>
+            <Text style={local.emptyText}>{t('appointments_empty_text')}</Text>
           </Card>
         ) : (
           appointments.map((appointment) => {
@@ -199,7 +241,7 @@ export default function AppointmentsScreen() {
                   <View style={local.doctorNameRow}>
                     <User size={16} color="#6b7280" />
                     <Text style={local.doctorName}>
-                      {appointment.doctorName || 'Doctor'}
+                      {appointment.doctorName || t('appointments_doctor_fallback')}
                     </Text>
                   </View>
                   <View
@@ -212,8 +254,7 @@ export default function AppointmentsScreen() {
                     ]}
                   >
                     <Text style={[local.statusText, { color: statusColor.text }]}>
-                      {appointment.status.charAt(0).toUpperCase() +
-                        appointment.status.slice(1)}
+                      {formatAppointmentStatus(appointment.status, t)}
                     </Text>
                   </View>
                 </View>
@@ -222,7 +263,7 @@ export default function AppointmentsScreen() {
                   <View style={local.detailRow}>
                     <Calendar size={16} color="#6b7280" />
                     <View style={local.detailText}>
-                      <Text style={local.detailLabel}>Date</Text>
+                      <Text style={local.detailLabel}>{t('appointments_date')}</Text>
                       <Text style={local.detailValue}>
                         {formatDate(appointment.appointmentDate)}
                       </Text>
@@ -232,7 +273,7 @@ export default function AppointmentsScreen() {
                   <View style={local.detailRow}>
                     <Clock size={16} color="#6b7280" />
                     <View style={local.detailText}>
-                      <Text style={local.detailLabel}>Time</Text>
+                      <Text style={local.detailLabel}>{t('appointments_time')}</Text>
                       <Text style={local.detailValue}>
                         {appointment.appointmentTime}
                       </Text>
@@ -247,16 +288,20 @@ export default function AppointmentsScreen() {
                     style={local.joinBtn}
                   >
                     <Video size={18} color="#ffffff" />
-                    <Text style={local.joinBtnText}>Join video call</Text>
+                    <Text style={local.joinBtnText}>{t('appointments_join_call')}</Text>
                   </TouchableOpacity>
                 ) : (
                   <View style={local.disabledBox}>
                     <Text style={local.disabledText}>
                       {appointment.status === 'pending'
-                        ? 'Waiting for doctor to accept'
+                        ? t('appointments_waiting_accept')
                         : isJoinableStatus(appointment.status)
-                        ? joinWindow.message
-                        : 'Cannot join this appointment'}
+                        ? translateJoinMessage(
+                            joinWindow.message,
+                            joinWindow.minutesUntilStart,
+                            t
+                          )
+                        : t('appointments_cannot_join')}
                     </Text>
                   </View>
                 )}

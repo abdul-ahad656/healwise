@@ -9,7 +9,9 @@ import {
   Linking,
   RefreshControl,
 } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 import { FileText, Calendar, Download } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import { PatientPrimaryButton } from '@/components/patient/PatientPrimaryButton';
@@ -17,6 +19,8 @@ import { patientScreenStyles as s } from '@/styles/patientScreen';
 import { getPatientPrescriptions, Prescription } from '@/services/doctorPanelService';
 
 export default function PrescriptionsScreen() {
+  const router = useRouter();
+  const { t, i18n } = useTranslation();
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,7 +34,7 @@ export default function PrescriptionsScreen() {
       const data = await getPatientPrescriptions();
       setPrescriptions(data);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load prescriptions');
+      Alert.alert('Error', t('prescriptions_error_load'));
       console.error(error);
     } finally {
       setLoading(false);
@@ -47,7 +51,7 @@ export default function PrescriptionsScreen() {
     try {
       await Linking.openURL(url);
     } catch (error) {
-      Alert.alert('Error', 'Failed to open prescription');
+      Alert.alert('Error', t('prescriptions_error_open'));
       console.error(error);
     }
   };
@@ -55,7 +59,8 @@ export default function PrescriptionsScreen() {
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
+      const locale = i18n.language === 'ur' ? 'ur-PK' : 'en-US';
+      return date.toLocaleDateString(locale, {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -70,9 +75,10 @@ export default function PrescriptionsScreen() {
       <View style={[StyleSheet.absoluteFill, s.pageBg]} />
 
       <PatientScreenHeader
-        title="My Prescriptions"
-        subtitle="View prescriptions from your doctors"
+        title={t('prescriptions_title')}
+        subtitle={t('prescriptions_subtitle')}
         colors={['#22c55e', '#3b82f6']}
+        onBack={() => router.navigate('/(patient)/home' as Href)}
       />
 
       <ScrollView
@@ -86,15 +92,13 @@ export default function PrescriptionsScreen() {
         {loading ? (
           <View style={local.center}>
             <ActivityIndicator size="large" color="#22c55e" />
-            <Text style={s.infoText}>Loading prescriptions…</Text>
+            <Text style={s.infoText}>{t('prescriptions_loading')}</Text>
           </View>
         ) : prescriptions.length === 0 ? (
           <Card style={local.emptyCard}>
             <FileText size={48} color="#d1d5db" />
-            <Text style={local.emptyTitle}>No Prescriptions Yet</Text>
-            <Text style={local.emptyText}>
-              Your prescriptions from doctors will appear here once they upload them.
-            </Text>
+            <Text style={local.emptyTitle}>{t('prescriptions_empty_title')}</Text>
+            <Text style={local.emptyText}>{t('prescriptions_empty_text')}</Text>
           </Card>
         ) : (
           prescriptions.map((prescription) => (
@@ -102,7 +106,7 @@ export default function PrescriptionsScreen() {
               <View style={local.cardHeader}>
                 <View style={local.doctorInfo}>
                   <Text style={local.doctorName}>
-                    {prescription.doctorName || 'Doctor'}
+                    {prescription.doctorName || t('prescriptions_doctor_fallback')}
                   </Text>
                   {prescription.doctorSpecialization ? (
                     <Text style={local.specialization}>
@@ -118,7 +122,9 @@ export default function PrescriptionsScreen() {
                   <View style={local.detailRow}>
                     <Calendar size={16} color="#6b7280" />
                     <View style={local.detailText}>
-                      <Text style={local.detailLabel}>Appointment</Text>
+                      <Text style={local.detailLabel}>
+                        {t('prescriptions_appointment_label')}
+                      </Text>
                       <Text style={local.detailValue}>
                         {formatDate(prescription.appointmentDate)}
                         {prescription.appointmentTime
@@ -132,7 +138,9 @@ export default function PrescriptionsScreen() {
                 <View style={[local.detailRow, local.detailRowLast]}>
                   <Download size={16} color="#6b7280" />
                   <View style={local.detailText}>
-                    <Text style={local.detailLabel}>Uploaded</Text>
+                    <Text style={local.detailLabel}>
+                      {t('prescriptions_uploaded_label')}
+                    </Text>
                     <Text style={local.detailValue}>
                       {formatDate(prescription.uploadedAt)}
                     </Text>
@@ -142,13 +150,13 @@ export default function PrescriptionsScreen() {
 
               {prescription.notes ? (
                 <View style={local.notesSection}>
-                  <Text style={local.notesLabel}>Doctor&apos;s notes</Text>
+                  <Text style={local.notesLabel}>{t('prescriptions_notes_label')}</Text>
                   <Text style={local.notesText}>{prescription.notes}</Text>
                 </View>
               ) : null}
 
               <PatientPrimaryButton
-                label="View / Download"
+                label={t('prescriptions_view_download')}
                 variant="primary"
                 onPress={() => handleViewPrescription(prescription.cloudinaryUrl)}
                 style={local.actionBtn}

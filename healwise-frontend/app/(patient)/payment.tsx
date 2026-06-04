@@ -10,13 +10,12 @@ import {
   TextInput,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, CreditCard, CheckCircle, Copy, Upload, X } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { CreditCard, CheckCircle, Copy, Upload, X } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Card } from '@/components/ui/card';
 import { PatientPrimaryButton } from '@/components/patient/PatientPrimaryButton';
+import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import {
   createPayment,
   submitPaymentProof,
@@ -286,24 +285,11 @@ export default function PaymentScreen() {
   if (!doctorId || !appointmentDate || !appointmentTime) {
     return (
       <View style={styles.container}>
-        <LinearGradient
+        <PatientScreenHeader
+          title="Payment"
           colors={['#a855f7', '#ec4899']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.header}
-        >
-          <SafeAreaView edges={['top']}>
-            <View style={styles.headerContent}>
-              <Pressable
-                onPress={() => router.back()}
-                style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-              >
-                <ArrowLeft size={24} color="white" />
-              </Pressable>
-              <Text style={styles.headerTitle}>Payment</Text>
-            </View>
-          </SafeAreaView>
-        </LinearGradient>
+          onBack={() => router.back()}
+        />
         <View style={styles.centerContent}>
           <Text style={styles.errorText}>{error || 'Missing appointment details'}</Text>
         </View>
@@ -314,20 +300,10 @@ export default function PaymentScreen() {
   if (paymentSuccess || proofSubmitted) {
     return (
       <View style={styles.container}>
-        <LinearGradient
+        <PatientScreenHeader
+          title={paymentSuccess ? 'Payment Complete' : 'Proof Submitted'}
           colors={['#a855f7', '#ec4899']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.header}
-        >
-          <SafeAreaView edges={['top']}>
-            <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>
-                {paymentSuccess ? 'Payment Complete' : 'Proof Submitted'}
-              </Text>
-            </View>
-          </SafeAreaView>
-        </LinearGradient>
+        />
         <View style={styles.successContainer}>
           <CheckCircle size={80} color="#10b981" strokeWidth={1.5} />
           <Text style={styles.successTitle}>
@@ -353,24 +329,11 @@ export default function PaymentScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
+      <PatientScreenHeader
+        title="Payment"
         colors={['#a855f7', '#ec4899']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView edges={['top']}>
-          <View style={styles.headerContent}>
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-            >
-              <ArrowLeft size={24} color="white" />
-            </Pressable>
-            <Text style={styles.headerTitle}>Payment</Text>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+        onBack={() => router.back()}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -758,22 +721,6 @@ export default function PaymentScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#fff',
-  },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingVertical: 20, gap: 16 },
   centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center' },

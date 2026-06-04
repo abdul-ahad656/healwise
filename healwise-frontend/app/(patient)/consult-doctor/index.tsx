@@ -7,7 +7,7 @@ import {
   ScrollView,
   Linking,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { Star, Clock, Phone, Info } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
 import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
@@ -59,7 +59,7 @@ export default function DoctorConsultation() {
 
       <PatientScreenHeader
         title={t('doctor_consult_title')}
-        onBack={() => router.back()}
+        onBack={() => router.navigate('/(patient)/home' as Href)}
         colors={['#a855f7', '#ec4899']}
       />
 
@@ -175,10 +175,6 @@ export default function DoctorConsultation() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
-  header: { paddingHorizontal: 24, paddingBottom: 32, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
-  headerContent: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: 'white' },
-  headerSubtitle: { fontSize: 14, color: 'white', opacity: 0.8 },
   scrollView: { flex: 1, marginTop: -20 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
   statsGrid: { flexDirection: 'row', gap: 10, marginBottom: 24 },

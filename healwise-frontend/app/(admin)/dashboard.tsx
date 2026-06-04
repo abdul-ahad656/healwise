@@ -76,7 +76,7 @@ export default function AdminDashboard() {
             <View style={dash.cardIcon}>
               <Pill size={22} color="#0f172a" />
             </View>
-            <Text style={dash.cardTitle}>Medicine Types</Text>
+            <Text style={dash.cardTitle}>Medicine Awareness</Text>
             <Text style={dash.cardSubtitle}>
               Edit awareness content for medicine types
             </Text>

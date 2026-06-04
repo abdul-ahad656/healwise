@@ -1,7 +1,7 @@
 import { API_BASE_URL } from './config';
 import AuthStore from './authStore';
-import i18n from '@/i18n';
 import { fetchJson } from './httpClient';
+import { applyPatientLocale } from '@/utils/locale';
 
 export interface User {
   id?: string;
@@ -36,9 +36,8 @@ export const login = async (email: string, password: string): Promise<AuthRespon
     AuthStore.setToken(data.token);
     AuthStore.setUser(data.user);
 
-    const userLang = data.user?.language;
-    if (userLang) {
-      i18n.changeLanguage(userLang);
+    if (data.user?.role === 'patient' && data.user.language) {
+      applyPatientLocale(data.user.language);
     }
 
     return data;
@@ -78,11 +77,6 @@ export const register = async (
     AuthStore.setToken(data.token);
     AuthStore.setUser(data.user);
 
-    const userLang = data.user?.language;
-    if (userLang) {
-      i18n.changeLanguage(userLang);
-    }
-
     return data;
   } catch (error: any) {
     throw new Error(error.message || 'Network error');
@@ -115,7 +109,7 @@ export const setLanguagePreference = async (language: 'en' | 'ur'): Promise<void
   // Update local session + UI language immediately
   const user = AuthStore.getUser();
   AuthStore.setUser({ ...(user || {}), language });
-  i18n.changeLanguage(language);
+  applyPatientLocale(language);
 };
 
 export const resetPassword = async (

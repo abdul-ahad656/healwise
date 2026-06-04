@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { StyleSheet, View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import { applyEnglishLocale } from '@/utils/locale';
 import { Sparkles } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +11,10 @@ import { APP_NAME } from '@/constants/branding';
 
 export default function SplashScreen() {
   const router = useRouter();
+
+  useEffect(() => {
+    applyEnglishLocale();
+  }, []);
 
   const handleContinue = () => {
     router.push('/(auth)/login');

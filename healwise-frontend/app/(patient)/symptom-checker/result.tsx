@@ -5,13 +5,13 @@ import {
   Text,
   ScrollView,
   Pressable,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, AlertCircle, CheckCircle2, Activity } from 'lucide-react-native';
+import { AlertCircle, CheckCircle2, Activity } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
+import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import { SymptomAnalysisResult } from '@/services/symptomService';
 import { useTranslation } from 'react-i18next';
 
@@ -53,25 +53,12 @@ export default function SymptomResult() {
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Header */}
-      <LinearGradient
-        colors={["#ef4444", "#f97316"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView edges={['top']}>
-          <View style={styles.headerContent}>
-            <Pressable onPress={() => router.back()} style={styles.backButton}>
-              <ArrowLeft size={22} color="white" />
-            </Pressable>
-            <View>
-              <Text style={styles.headerTitle}>{t("symptom_result_title")}</Text>
-              <Text style={styles.headerSubtitle}>{t("symptom_result_subtitle")}</Text>
-            </View>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+      <PatientScreenHeader
+        title={t('symptom_result_title')}
+        subtitle={t('symptom_result_subtitle')}
+        colors={['#ef4444', '#f97316']}
+        onBack={() => router.back()}
+      />
 
       <ScrollView 
         style={styles.scrollView} 
@@ -146,29 +133,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 24,
-    // paddingTop: Platform.OS === 'android' ? 40 : 0,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  backButton: { padding: 8, marginLeft: -8, marginTop: 4 },
-  headerTextContainer: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF' },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 2,
-  },
   scrollView: {
     flex: 1,
-    marginTop: -20,
   },
   scrollContent: {
     padding: 20,

@@ -8,8 +8,8 @@ import { StripeProvider } from '@stripe/stripe-react-native';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import i18n from '@/i18n';
 import AuthStore from '@/services/authStore';
+import { applyEnglishLocale, applyPatientLocale } from '@/utils/locale';
 import Constants from 'expo-constants';
 
 export const unstable_settings = {
@@ -25,8 +25,12 @@ export default function RootLayout() {
     SplashScreen.hideAsync().catch(() => {});
 
     const user = AuthStore.getUser();
-    if (user?.language === 'ur' || user?.language === 'en') {
-      i18n.changeLanguage(user.language);
+    if (!user) {
+      applyEnglishLocale();
+    } else if (user.role === 'patient') {
+      applyPatientLocale(user.language);
+    } else {
+      applyEnglishLocale();
     }
   }, []);
 

@@ -9,13 +9,13 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
-import { ArrowLeft, Search, DollarSign, Star, Info, Mic, MicOff } from 'lucide-react-native';
+import { Search, DollarSign, Star, Info, Mic, MicOff } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
+import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import { compareMedicines, CompareResult } from '@/services/medicineService';
 import { useTranslation } from 'react-i18next';
 import {
@@ -171,24 +171,11 @@ export default function MedicineComparison() {
         style={StyleSheet.absoluteFill}
       />
 
-      <LinearGradient
-        colors={["#3b82f6", "#06b6d4"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView>
-          <View style={styles.headerContent}>
-            <Pressable onPress={() => router.back()} hitSlop={20} style={styles.backButton}>
-              <ArrowLeft size={22} color="white" />
-            </Pressable>
-            <View>
-              <Text style={styles.headerTitle}>{t("medicine_compare_title")}</Text>
-              {/* <Text style={styles.headerSubtitle}>{t("medicine_compare_subtitle")}</Text> */}
-            </View>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+      <PatientScreenHeader
+        title={t('medicine_compare_title')}
+        colors={['#3b82f6', '#06b6d4']}
+        onBack={() => router.navigate('/(patient)/home' as Href)}
+      />
 
       <ScrollView 
         style={styles.scrollView} 
@@ -343,21 +330,7 @@ export default function MedicineComparison() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  headerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 10,
-  },
-  backButton: { padding: 8, marginLeft: -8, marginRight: 8 },
-  headerTitle: { fontSize: 20, fontWeight: "700", color: "#FFFFFF" },
-  headerSubtitle: { fontSize: 14, color: "#FFFFFF", opacity: 0.9 },
-  scrollView: { flex: 1, marginTop: -20 },
+  scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 24, paddingBottom: 40 },
   card: {
     backgroundColor: "#FFFFFF",

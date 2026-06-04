@@ -11,11 +11,9 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-  ArrowLeft,
   BookOpen,
   ChevronDown,
   Search,
@@ -28,6 +26,7 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
+import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import {
   getHealthTips,
   getHealthTipCategories,
@@ -139,28 +138,11 @@ export default function HealthEducation() {
         style={StyleSheet.absoluteFill}
       />
 
-      <LinearGradient
+      <PatientScreenHeader
+        title={t('health_education_title')}
         colors={['#22c55e', '#10b981']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView edges={['top', 'left', 'right']}>
-          <View style={styles.headerContent}>
-            <Pressable
-              onPress={() => router.back()}
-              hitSlop={20}
-              style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.6 }]}
-            >
-              <ArrowLeft size={22} color="white" />
-            </Pressable>
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.headerTitle}>{t('health_education_title')}</Text>
-              {/* <Text style={styles.headerSubtitle}>{t('health_education_subtitle')}</Text> */}
-            </View>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+        onBack={() => router.navigate('/(patient)/home' as Href)}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -281,27 +263,6 @@ export default function HealthEducation() {
                     : t('health_type_disease')}
                 </Text>
               </LinearGradient>
-
-              {featuredTip && (
-                <Pressable
-                  onPress={() => setExpandedTip(featuredTip)}
-                  style={({ pressed }) => [styles.featuredCard, pressed && { opacity: 0.95 }]}
-                >
-                  <LinearGradient
-                    colors={['#ecfdf5', '#d1fae5']}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <View style={styles.featuredHeader}>
-                    <Sparkles size={18} color="#059669" />
-                    <Text style={styles.featuredLabel}>{t('health_daily_tip_label')}</Text>
-                  </View>
-                  <Text style={styles.featuredTitle}>{featuredTip.title}</Text>
-                  <Text style={styles.featuredDesc} numberOfLines={3}>
-                    {featuredTip.description}
-                  </Text>
-                  <Text style={styles.readMore}>{t('health_read_now')} →</Text>
-                </Pressable>
-              )}
 
               {tips.map((tip) => (
                 <Pressable
@@ -486,17 +447,6 @@ export default function HealthEducation() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  headerContent: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  backButton: { padding: 8, marginLeft: -8, marginTop: 4 },
-  headerTextContainer: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF' },
-  headerSubtitle: { fontSize: 14, color: '#FFFFFF', opacity: 0.9, marginTop: 2 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
 

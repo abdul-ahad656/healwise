@@ -41,17 +41,10 @@ export default function LoginScreen() {
 
       // Defer navigation so loading state clears and the router commit isn’t blocked on Android.
       InteractionManager.runAfterInteractions(() => {
-        if (!userLang) {
-          const next =
-            role === "doctor"
-              ? "/(doctor)/dashboard"
-              : role === "admin"
-                ? "/(admin)/dashboard"
-                : "/(patient)/home";
-
+        if (!userLang && role === "patient") {
           router.replace({
             pathname: "/(auth)/language",
-            params: { next },
+            params: { next: "/(patient)/home" },
           } as any);
           return;
         }

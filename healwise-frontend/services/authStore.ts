@@ -1,4 +1,6 @@
- class AuthStore {
+import { applyEnglishLocale } from '@/utils/locale';
+
+class AuthStore {
   private static instance: AuthStore;
   private token: string | null = null;
   private user: any | null = null;
@@ -31,6 +33,7 @@
   public clear() {
     this.token = null;
     this.user = null;
+    applyEnglishLocale();
   }
 }
 

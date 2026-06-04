@@ -8,13 +8,13 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
-import { ArrowLeft, Mic, MicOff, Search, Info } from 'lucide-react-native';
+import { Mic, MicOff, Search, Info } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
+import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import { analyzeSymptoms } from '@/services/symptomService';
 import {
   getVoiceModule,
@@ -131,24 +131,11 @@ export default function SymptomChecker() {
         style={StyleSheet.absoluteFill}
       />
 
-      <LinearGradient
-        colors={["#ef4444", "#f97316"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <SafeAreaView edges={['top']}>
-          <View style={styles.headerContent}>
-            <Pressable onPress={() => router.back()} hitSlop={20} style={styles.backButton}>
-              <ArrowLeft size={22} color="white" />
-            </Pressable>
-            <View>
-              <Text style={styles.headerTitle}>{t("symptom_checker_title")}</Text>
-              {/* <Text style={styles.headerSubtitle}>{t("symptom_checker_subtitle")}</Text> */}
-            </View>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+      <PatientScreenHeader
+        title={t('symptom_checker_title')}
+        colors={['#ef4444', '#f97316']}
+        onBack={() => router.navigate('/(patient)/home' as Href)}
+      />
 
       <ScrollView 
         style={styles.scrollView} 
@@ -227,16 +214,7 @@ export default function SymptomChecker() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingBottom: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-  },
-  headerContent: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 15 },
-  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: 'white' },
-  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.9)', marginTop: 2 },
-  scrollView: { flex: 1, marginTop: -20 },
+  scrollView: { flex: 1 },
   scrollContent: { padding: 20 },
   card: { padding: 20, borderRadius: 20, backgroundColor: 'white', elevation: 5 },
   cardTitle: { fontSize: 16, fontWeight: '600', color: '#374151', marginBottom: 16 },
