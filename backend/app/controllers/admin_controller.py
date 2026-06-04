@@ -4,6 +4,8 @@ from bson.objectid import ObjectId
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 from app.models.user_model import normalize_consultation_fee_for_storage
+from app.utils.email_validator import validate_email
+from app.utils.password_validator import validate_password_strength
 
 def get_doctors():
     doctors = list(mongo.db.users.find({"role": "doctor"}))
@@ -32,14 +34,29 @@ def toggle_doctor_status(doctor_id):
 
 
 def create_doctor():
-    data = request.json
+    data = request.json or {}
 
     # Basic validation
     if not all(k in data for k in ["name", "email", "password"]):
         return jsonify({"error": "Missing required fields"}), 400
 
+    if not str(data.get("name", "")).strip():
+        return jsonify({"error": "Doctor name is required"}), 400
+
+    is_email_valid, email_error = validate_email(data.get("email"))
+    if not is_email_valid:
+        return jsonify({"error": email_error}), 400
+
+    is_password_valid, password_error = validate_password_strength(
+        data.get("password")
+    )
+    if not is_password_valid:
+        return jsonify({"error": password_error}), 400
+
+    normalized_email = str(data["email"]).strip().lower()
+
     # Check if email exists
-    if mongo.db.users.find_one({"email": data["email"]}):
+    if mongo.db.users.find_one({"email": normalized_email}):
         return jsonify({"error": "Email already exists"}), 409
 
     consultation_fee = normalize_consultation_fee_for_storage(
@@ -51,8 +68,8 @@ def create_doctor():
         }), 400
 
     doctor = {
-        "name": data["name"],
-        "email": data["email"],
+        "name": str(data["name"]).strip(),
+        "email": normalized_email,
         "password": generate_password_hash(data["password"]),
         "role": "doctor",
         "language": data.get("language", "en"),
@@ -82,9 +99,24 @@ def update_doctor(doctor_id):
 
     update_fields = {}
 
-    for field in ["name", "email", "language", "specialization", "experience", "hospital"]:
+    for field in ["name", "language", "specialization", "experience", "hospital"]:
         if field in data:
             update_fields[field] = data[field]
+
+    if "name" in update_fields:
+        update_fields["name"] = str(update_fields["name"]).strip()
+        if not update_fields["name"]:
+            return jsonify({"error": "Doctor name is required"}), 400
+
+    if "email" in data:
+        is_email_valid, email_error = validate_email(data.get("email"))
+        if not is_email_valid:
+            return jsonify({"error": email_error}), 400
+        normalized_email = str(data["email"]).strip().lower()
+        existing = mongo.db.users.find_one({"email": normalized_email})
+        if existing and str(existing["_id"]) != str(doctor_id):
+            return jsonify({"error": "Email already exists"}), 409
+        update_fields["email"] = normalized_email
 
     if "consultationFee" in data:
         update_fields["consultationFee"] = normalize_consultation_fee_for_storage(
@@ -92,6 +124,11 @@ def update_doctor(doctor_id):
         )
 
     if "password" in data and data["password"]:
+        is_password_valid, password_error = validate_password_strength(
+            data["password"]
+        )
+        if not is_password_valid:
+            return jsonify({"error": password_error}), 400
         update_fields["password"] = generate_password_hash(data["password"])
 
     if "active" in data:

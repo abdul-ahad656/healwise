@@ -27,39 +27,59 @@ import {
   adminPrimaryButtonStyle,
   adminPrimaryButtonTextStyle,
 } from '@/components/admin/AdminActionButton';
+import { validateEmail } from '@/utils/emailValidator';
+import { validatePassword } from '@/utils/passwordValidator';
+import { useTranslation } from 'react-i18next';
 
 function Field({
   label,
   children,
+  error,
 }: {
   label: string;
   children: React.ReactNode;
+  error?: string;
 }) {
   return (
     <View style={s.fieldSpacing}>
       <Text style={s.fieldLabel}>{label}</Text>
       {children}
+      {error ? <Text style={local.fieldError}>{error}</Text> : null}
     </View>
   );
 }
 
+const EMPTY_FORM: CreateDoctorPayload = {
+  name: '',
+  email: '',
+  password: '',
+  language: 'en',
+  specialization: '',
+  experience: '',
+  hospital: '',
+  consultationFee: undefined,
+};
+
 export default function ManageDoctorsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [doctors, setDoctors] = useState<AdminDoctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<CreateDoctorPayload>({
-    name: '',
-    email: '',
-    password: '',
-    language: 'en',
-    specialization: '',
-    experience: '',
-    hospital: '',
-    consultationFee: undefined,
-  });
+  const [form, setForm] = useState<CreateDoctorPayload>({ ...EMPTY_FORM });
   const [editingDoctorId, setEditingDoctorId] = useState<string | null>(null);
+
+  const emailValidation = validateEmail(form.email);
+  const passwordValidation = validatePassword(form.password);
+  const isCreating = !editingDoctorId;
+  const passwordValid = isCreating
+    ? passwordValidation.isValid && form.password.length > 0
+    : !form.password || passwordValidation.isValid;
+  const canSave =
+    form.name.trim().length > 0 &&
+    emailValidation.isValid &&
+    passwordValid;
 
   const loadDoctors = async () => {
     try {
@@ -88,20 +108,43 @@ export default function ManageDoctorsScreen() {
   };
 
   const handleSave = async () => {
-    if (!form.name || !form.email || (!editingDoctorId && !form.password)) {
+    if (!form.name.trim()) {
+      Alert.alert('Validation', 'Doctor name is required');
+      return;
+    }
+
+    if (!emailValidation.isValid) {
       Alert.alert(
         'Validation',
-        'Name and email are required. Password is required for new doctors'
+        emailValidation.error ? t(emailValidation.error) : 'Invalid email'
       );
       return;
     }
+
+    if (isCreating && !passwordValidation.isValid) {
+      Alert.alert(
+        'Validation',
+        t(passwordValidation.errors[0] || 'password_error_required')
+      );
+      return;
+    }
+
+    if (!isCreating && form.password && !passwordValidation.isValid) {
+      Alert.alert(
+        'Validation',
+        t(passwordValidation.errors[0] || 'password_error_required')
+      );
+      return;
+    }
+
+    const normalizedEmail = form.email.trim().toLowerCase();
 
     setSaving(true);
     try {
       if (editingDoctorId) {
         const updatePayload: Partial<CreateDoctorPayload> = {
-          name: form.name,
-          email: form.email,
+          name: form.name.trim(),
+          email: normalizedEmail,
           language: form.language,
           specialization: form.specialization || undefined,
           experience: form.experience || undefined,
@@ -126,6 +169,8 @@ export default function ManageDoctorsScreen() {
       } else {
         const payload: CreateDoctorPayload = {
           ...form,
+          name: form.name.trim(),
+          email: normalizedEmail,
           consultationFee: form.consultationFee
             ? Number(form.consultationFee)
             : undefined,
@@ -134,16 +179,7 @@ export default function ManageDoctorsScreen() {
         await loadDoctors();
       }
 
-      setForm({
-        name: '',
-        email: '',
-        password: '',
-        language: 'en',
-        specialization: '',
-        experience: '',
-        hospital: '',
-        consultationFee: undefined,
-      });
+      setForm({ ...EMPTY_FORM });
       setEditingDoctorId(null);
     } catch (err: any) {
       Alert.alert(
@@ -175,16 +211,7 @@ export default function ManageDoctorsScreen() {
       await deleteAdminDoctor(id);
       setDoctors((prev) => prev.filter((d) => d._id !== id));
       if (editingDoctorId === id) {
-        setForm({
-          name: '',
-          email: '',
-          password: '',
-          language: 'en',
-          specialization: '',
-          experience: '',
-          hospital: '',
-          consultationFee: undefined,
-        });
+        setForm({ ...EMPTY_FORM });
         setEditingDoctorId(null);
       }
     } catch (err: any) {
@@ -222,22 +249,49 @@ export default function ManageDoctorsScreen() {
               onChangeText={(text) => setForm((f) => ({ ...f, name: text }))}
             />
           </Field>
-          <Field label="Email">
+          <Field
+            label="Email"
+            error={
+              form.email.length > 0 && !emailValidation.isValid && emailValidation.error
+                ? t(emailValidation.error)
+                : undefined
+            }
+          >
             <TextInput
-              style={s.input}
-              placeholder="Email address"
+              style={[
+                s.input,
+                form.email.length > 0 &&
+                  !emailValidation.isValid &&
+                  local.inputError,
+              ]}
+              placeholder={t('email_register_placeholder')}
               placeholderTextColor={PLACEHOLDER_COLOR}
               autoCapitalize="none"
+              autoCorrect={false}
               keyboardType="email-address"
               value={form.email}
               onChangeText={(text) => setForm((f) => ({ ...f, email: text }))}
             />
           </Field>
-          <Field label="Password">
+          <Field
+            label="Password"
+            error={
+              form.password.length > 0 && !passwordValidation.isValid
+                ? t(passwordValidation.errors[0] || 'password_error_required')
+                : undefined
+            }
+          >
             <TextInput
-              style={s.input}
+              style={[
+                s.input,
+                ((isCreating && !passwordValid) ||
+                  (form.password.length > 0 && !passwordValidation.isValid)) &&
+                  local.inputError,
+              ]}
               placeholder={
-                editingDoctorId ? 'New password (optional)' : 'Password'
+                editingDoctorId
+                  ? 'New password (optional, same rules as registration)'
+                  : t('password_register_placeholder')
               }
               placeholderTextColor={PLACEHOLDER_COLOR}
               secureTextEntry
@@ -309,8 +363,11 @@ export default function ManageDoctorsScreen() {
 
           <Pressable
             onPress={handleSave}
-            disabled={saving}
-            style={[adminPrimaryButtonStyle, { opacity: saving ? 0.6 : 1 }]}
+            disabled={saving || !canSave}
+            style={[
+              adminPrimaryButtonStyle,
+              { opacity: saving || !canSave ? 0.6 : 1 },
+            ]}
           >
             <Text style={adminPrimaryButtonTextStyle}>
               {saving
@@ -361,3 +418,15 @@ export default function ManageDoctorsScreen() {
     </View>
   );
 }
+
+const local = StyleSheet.create({
+  fieldError: {
+    fontSize: 12,
+    color: '#b91c1c',
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  inputError: {
+    borderColor: '#f87171',
+  },
+});
