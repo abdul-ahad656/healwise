@@ -19,6 +19,16 @@ export interface CompareResult {
   alternatives: Medicine[];
 }
 
+export interface MedicineSuggestion {
+  id: string;
+  name: string;
+}
+
+export interface MedicinePotenciesResponse {
+  medicine: string;
+  potencies: string[];
+}
+
 export interface MedicineHistoryEntry {
   _id: string;
   query: string;
@@ -103,6 +113,67 @@ export const compareMedicines = async (
   } catch (error: any) {
     throw new Error(error.message || 'Network error');
   }
+};
+
+export const getMedicineSuggestions = async (
+  query: string
+): Promise<MedicineSuggestion[]> => {
+  const token = AuthStore.getToken();
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const q = query.trim();
+  if (q.length < 2) {
+    return [];
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/medicines/suggestions?q=${encodeURIComponent(q)}`,
+    {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to load medicine suggestions');
+  }
+
+  return Array.isArray(data) ? data : [];
+};
+
+export const getMedicinePotencies = async (
+  name: string
+): Promise<MedicinePotenciesResponse> => {
+  const token = AuthStore.getToken();
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return { medicine: '', potencies: [] };
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/medicines/potencies?name=${encodeURIComponent(trimmed)}`,
+    {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to load potencies');
+  }
+
+  return {
+    medicine: String(data.medicine ?? trimmed),
+    potencies: Array.isArray(data.potencies) ? data.potencies.map(String) : [],
+  };
 };
 
 export const getMedicineHistory = async (): Promise<MedicineHistoryEntry[]> => {

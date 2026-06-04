@@ -16,7 +16,7 @@ import { Search, DollarSign, Star, Info, Mic, MicOff } from 'lucide-react-native
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
-import { compareMedicines, CompareResult } from '@/services/medicineService';
+import { compareMedicines, getMedicineSuggestions, getMedicinePotencies, CompareResult, MedicineSuggestion } from '@/services/medicineService';
 import { useTranslation } from 'react-i18next';
 import {
   getVoiceModule,
@@ -28,7 +28,13 @@ export default function MedicineComparison() {
   const router = useRouter();
   const isFocused = useIsFocused();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedMedicineName, setSelectedMedicineName] = useState('');
   const [strength, setStrength] = useState('');
+  const [potencies, setPotencies] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<MedicineSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [loadingPotencies, setLoadingPotencies] = useState(false);
   const [results, setResults] = useState<CompareResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +61,9 @@ export default function MedicineComparison() {
     Voice.onSpeechResults = (e) => {
       if (isFocused && e.value && e.value[0]) {
         setSearchTerm(e.value[0]);
+        setSelectedMedicineName('');
+        setStrength('');
+        setPotencies([]);
       }
     };
 
@@ -84,12 +93,97 @@ export default function MedicineComparison() {
     React.useCallback(() => {
       return () => {
         setSearchTerm('');
+        setSelectedMedicineName('');
         setStrength('');
+        setPotencies([]);
+        setSuggestions([]);
+        setShowSuggestions(false);
         setResults(null);
         setError(null);
       };
     }, [])
   );
+
+  useEffect(() => {
+    const query = searchTerm.trim();
+    if (query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    if (selectedMedicineName && query.toLowerCase() === selectedMedicineName.toLowerCase()) {
+      setShowSuggestions(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setLoadingSuggestions(true);
+      try {
+        const data = await getMedicineSuggestions(query);
+        setSuggestions(data);
+        setShowSuggestions(true);
+      } catch (err) {
+        console.error('Suggestions error:', err);
+        setSuggestions([]);
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, selectedMedicineName]);
+
+  useEffect(() => {
+    if (!selectedMedicineName) {
+      setPotencies([]);
+      setStrength('');
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setLoadingPotencies(true);
+      try {
+        const data = await getMedicinePotencies(selectedMedicineName);
+        if (cancelled) return;
+        setPotencies(data.potencies);
+        setSelectedMedicineName(data.medicine || selectedMedicineName);
+        setSearchTerm(data.medicine || selectedMedicineName);
+        setStrength((prev) =>
+          data.potencies.includes(prev) ? prev : ''
+        );
+      } catch (err) {
+        console.error('Potencies error:', err);
+        if (!cancelled) setPotencies([]);
+      } finally {
+        if (!cancelled) setLoadingPotencies(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMedicineName]);
+
+  const handleMedicineNameChange = (text: string) => {
+    setSearchTerm(text);
+    if (selectedMedicineName && text.trim().toLowerCase() !== selectedMedicineName.toLowerCase()) {
+      setSelectedMedicineName('');
+      setStrength('');
+      setPotencies([]);
+    }
+  };
+
+  const handleSelectSuggestion = (item: MedicineSuggestion) => {
+    setSearchTerm(item.name);
+    setSelectedMedicineName(item.name);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setStrength('');
+    setResults(null);
+    setError(null);
+  };
 
   const startListening = async () => {
     try {
@@ -134,7 +228,7 @@ export default function MedicineComparison() {
   };
 
   const handleSearch = async () => {
-    const name = searchTerm.trim();
+    const name = (selectedMedicineName || searchTerm).trim();
     const potency = strength.trim();
 
     if (!name || !potency) {
@@ -161,7 +255,8 @@ export default function MedicineComparison() {
     }
   };
 
-  const canSearch = searchTerm.trim().length > 0 && strength.trim().length > 0;
+  const canSearch =
+    (selectedMedicineName || searchTerm.trim()).length > 0 && strength.trim().length > 0;
 
   return (
     <View style={styles.container}>
@@ -185,46 +280,96 @@ export default function MedicineComparison() {
         <Card style={styles.card}>
           <Text style={styles.cardTitle}>{t("medicine_find_alternatives")}</Text>
 
-          <View style={[styles.inputWrapper, isListening && styles.inputWrapperActive]}>
-            <Search size={18} color="#9CA3AF" style={styles.inputIcon} />
-            <TextInput
-              placeholder={isListening ? "Listening..." : t("medicine_search_placeholder")}
-              placeholderTextColor={isListening ? "#3b82f6" : "#9CA3AF"}
-              value={searchTerm}
-              onChangeText={setSearchTerm}
-              style={styles.input}
-              editable={!loading}
-            />
-            <Pressable
-              onPress={handleMicPress}
-              disabled={!isVoiceLinked}
-              style={({ pressed }) => [
-                styles.micButton,
-                isListening && styles.micButtonActive,
-                !isVoiceLinked && styles.micButtonDisabled,
-                pressed && { opacity: 0.7 }
-              ]}
-            >
-              {isListening ? (
-                <Mic size={18} color="white" />
-              ) : (
-                <MicOff size={18} color="#9CA3AF" />
-              )}
-            </Pressable>
+          <View style={styles.suggestBlock}>
+            <View style={[styles.inputWrapper, isListening && styles.inputWrapperActive]}>
+              <Search size={18} color="#9CA3AF" style={styles.inputIcon} />
+              <TextInput
+                placeholder={isListening ? "Listening..." : t("medicine_search_placeholder")}
+                placeholderTextColor={isListening ? "#3b82f6" : "#9CA3AF"}
+                value={searchTerm}
+                onChangeText={handleMedicineNameChange}
+                onFocus={() => {
+                  if (suggestions.length > 0) setShowSuggestions(true);
+                }}
+                style={styles.input}
+                editable={!loading}
+              />
+              <Pressable
+                onPress={handleMicPress}
+                disabled={!isVoiceLinked}
+                style={({ pressed }) => [
+                  styles.micButton,
+                  isListening && styles.micButtonActive,
+                  !isVoiceLinked && styles.micButtonDisabled,
+                  pressed && { opacity: 0.7 }
+                ]}
+              >
+                {isListening ? (
+                  <Mic size={18} color="white" />
+                ) : (
+                  <MicOff size={18} color="#9CA3AF" />
+                )}
+              </Pressable>
+            </View>
+
+            {loadingSuggestions ? (
+              <Text style={styles.hintText}>{t('medicine_loading_suggestions')}</Text>
+            ) : null}
+
+            {showSuggestions && searchTerm.trim().length >= 2 ? (
+              <View style={styles.suggestionsList}>
+                {suggestions.length > 0 ? (
+                  suggestions.map((item) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => handleSelectSuggestion(item)}
+                      style={({ pressed }) => [
+                        styles.suggestionRow,
+                        pressed && { backgroundColor: '#eff6ff' },
+                      ]}
+                    >
+                      <Text style={styles.suggestionText}>{item.name}</Text>
+                    </Pressable>
+                  ))
+                ) : (
+                  !loadingSuggestions && (
+                    <Text style={styles.hintText}>{t('medicine_no_suggestions')}</Text>
+                  )
+                )}
+              </View>
+            ) : null}
           </View>
 
-          <View style={styles.inputWrapper}>
-            <TextInput
-              placeholder={t('medicine_strength_placeholder')}
-              placeholderTextColor="#9CA3AF"
-              value={strength}
-              onChangeText={setStrength}
-              style={styles.input}
-              editable={!loading}
-              autoCapitalize="none"
-              keyboardType="default"
-            />
-          </View>
+          <Text style={styles.potencyLabel}>{t('medicine_select_potency')}</Text>
+          {loadingPotencies ? (
+            <ActivityIndicator color="#3b82f6" style={{ marginBottom: 12 }} />
+          ) : selectedMedicineName && potencies.length > 0 ? (
+            <View style={styles.potencyGrid}>
+              {potencies.map((pot) => {
+                const active = strength === pot;
+                return (
+                  <Pressable
+                    key={pot}
+                    onPress={() => setStrength(pot)}
+                    style={[styles.potencyChip, active && styles.potencyChipActive]}
+                  >
+                    <Text
+                      style={[
+                        styles.potencyChipText,
+                        active && styles.potencyChipTextActive,
+                      ]}
+                    >
+                      {pot}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : selectedMedicineName ? (
+            <Text style={styles.hintText}>{t('medicine_no_potencies')}</Text>
+          ) : (
+            <Text style={styles.hintText}>{t('medicine_select_potency')}</Text>
+          )}
 
           {!isVoiceLinked && isVoiceSupported && (
             <Text style={styles.voiceUnavailableHint}>Voice recognition not available</Text>
@@ -310,17 +455,6 @@ export default function MedicineComparison() {
                 </Card>
               );
             })}
-
-            {/* Savings Tip */}
-            <View style={styles.tipCard}>
-              <Star size={20} color="#15803d" />
-              <View style={styles.tipContent}>
-                <Text style={styles.tipTitle}>{t("medicine_money_saving_tip_title")}</Text>
-                <Text style={styles.tipText}>
-                  {t("medicine_money_saving_tip_text")}
-                </Text>
-              </View>
-            </View>
           </View>
         )}
       </ScrollView>
@@ -366,6 +500,64 @@ const styles = StyleSheet.create({
   },
   inputIcon: { marginRight: 10 },
   input: { flex: 1, fontSize: 15, color: '#111827' },
+  suggestBlock: { marginBottom: 8, zIndex: 10 },
+  suggestionsList: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  suggestionRow: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  suggestionText: {
+    fontSize: 15,
+    color: '#111827',
+    fontWeight: '600',
+  },
+  hintText: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  potencyLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  potencyGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  potencyChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  potencyChipActive: {
+    backgroundColor: '#dbeafe',
+    borderColor: '#3b82f6',
+  },
+  potencyChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  potencyChipTextActive: {
+    color: '#1d4ed8',
+  },
   micButton: {
     padding: 8,
     marginLeft: 8,

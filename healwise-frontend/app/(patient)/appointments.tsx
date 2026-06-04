@@ -373,8 +373,7 @@ export default function AppointmentsScreen() {
                   appointment.status === 'confirmed' ||
                   appointment.status === 'in_progress') && (
                   <View style={local.actionsCol}>
-                    {!appointment.patientMarkedComplete &&
-                    appointment.status !== 'completed' ? (
+                    {!appointment.patientMarkedComplete ? (
                       <PatientPrimaryButton
                         label={t('appointments_mark_complete')}
                         variant="primary"
