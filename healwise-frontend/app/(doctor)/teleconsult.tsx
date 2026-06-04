@@ -16,7 +16,6 @@ import ConsultationRoom from '@/components/VideoCall/ConsultationRoom';
 import {
   getDoctorAppointments,
   startConsultation,
-  recordConsultationLeave,
   Appointment,
 } from '@/services/doctorPanelService';
 import AuthStore from '@/services/authStore';
@@ -116,22 +115,44 @@ export default function TeleconsultScreen() {
   const activeCallRef = useRef<CallState | null>(activeCall);
   activeCallRef.current = activeCall;
 
-  const handleCallEnded = useCallback(() => {
-    const endedAppointmentId = activeCallRef.current?.appointmentId;
-    setActiveCall(null);
+  const handleCallEnded = useCallback(
+    (result?: {
+      autoCompleted?: boolean;
+      consultationDurationMinutes?: number;
+    }) => {
+      const endedAppointmentId = activeCallRef.current?.appointmentId;
+      setActiveCall(null);
 
-    if (!endedAppointmentId) return;
+      if (!endedAppointmentId) return;
 
-    void (async () => {
-      try {
-        const result = await recordConsultationLeave(endedAppointmentId);
-        await loadAppointments();
-        if (result.autoCompleted) {
+      void (async () => {
+        try {
+          await loadAppointments();
+          if (result?.autoCompleted) {
+            Alert.alert(
+              'Consultation completed',
+              'Call duration was recorded and the appointment was marked complete.',
+              [
+                { text: 'Later', style: 'cancel' },
+                {
+                  text: 'Upload prescription',
+                  onPress: () =>
+                    router.push({
+                      pathname: '/(doctor)/upload-prescription',
+                      params: { appointmentId: endedAppointmentId },
+                    }),
+                },
+              ]
+            );
+            return;
+          }
           Alert.alert(
-            'Consultation completed',
-            'Call duration was recorded and the appointment was marked complete.',
+            'Consultation ended',
+            result?.consultationDurationMinutes
+              ? `Recorded ${result.consultationDurationMinutes} min. Mark complete from Appointments when ready, or wait for patient confirmation / auto-complete after 30 min.`
+              : 'Duration is being recorded. Mark complete from Appointments after enough consultation time or patient confirmation.',
             [
-              { text: 'Later', style: 'cancel' },
+              { text: 'OK', style: 'cancel' },
               {
                 text: 'Upload prescription',
                 onPress: () =>
@@ -142,33 +163,16 @@ export default function TeleconsultScreen() {
               },
             ]
           );
-          return;
+        } catch (err: any) {
+          Alert.alert(
+            'Could not refresh',
+            err.message || 'The call ended but the list could not be updated.'
+          );
         }
-        Alert.alert(
-          'Consultation ended',
-          result.consultationDurationMinutes
-            ? `Recorded ${result.consultationDurationMinutes} min. Mark complete from Appointments when ready, or wait for patient confirmation / auto-complete after 30 min.`
-            : 'Duration is being recorded. Mark complete from Appointments after enough consultation time or patient confirmation.',
-          [
-            { text: 'OK', style: 'cancel' },
-            {
-              text: 'Upload prescription',
-              onPress: () =>
-                router.push({
-                  pathname: '/(doctor)/upload-prescription',
-                  params: { appointmentId: endedAppointmentId },
-                }),
-            },
-          ]
-        );
-      } catch (err: any) {
-        Alert.alert(
-          'Could not save consultation',
-          err.message || 'The call ended but duration could not be saved.'
-        );
-      }
-    })();
-  }, [loadAppointments, router]);
+      })();
+    },
+    [loadAppointments, router]
+  );
 
   if (activeCall) {
     return (

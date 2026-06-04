@@ -1,24 +1,17 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useZegoConfig } from '@/hooks/useZegoConfig';
 import {
   recordConsultationJoin,
   recordConsultationLeave,
 } from '@/services/doctorPanelService';
-
-// ─── Props ────────────────────────────────────────────────────────────────────
+import type { ConsultationLeaveResult } from '@/types/consultation';
 
 export interface ConsultationRoomProps {
-  /** MongoDB _id of the appointment – used as the ZEGOCLOUD room ID. */
   appointmentId: string;
-  /** Unique identifier for the current user (ZEGOCLOUD userID). */
   userID: string;
-  /** Display name shown inside the call to the remote participant. */
   userName: string;
-  /** Called when the user leaves the call — parent should clear call state. */
-  onLeave?: () => void;
+  onLeave?: (result?: ConsultationLeaveResult) => void;
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ConsultationRoom({
   appointmentId,
@@ -28,28 +21,39 @@ export default function ConsultationRoom({
 }: ConsultationRoomProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const leaveRecordedRef = useRef(false);
+  const [joinReady, setJoinReady] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
   const { appID, appSign, error } = useZegoConfig();
 
   useEffect(() => {
-    recordConsultationJoin(appointmentId).catch(() => {});
-    return () => {
-      if (!leaveRecordedRef.current) {
-        leaveRecordedRef.current = true;
-        recordConsultationLeave(appointmentId).catch(() => {});
+    let cancelled = false;
+    setJoinReady(false);
+    setJoinError(null);
+
+    (async () => {
+      try {
+        await recordConsultationJoin(appointmentId);
+        if (!cancelled) setJoinReady(true);
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setJoinError(
+            err instanceof Error ? err.message : 'Could not register for consultation'
+          );
+        }
       }
+    })();
+
+    return () => {
+      cancelled = true;
     };
   }, [appointmentId]);
 
   useEffect(() => {
-    // SSR guard: expo-router web SSR runs in Node where `document` doesn't exist.
     if (typeof document === 'undefined') return;
-
-    // Do not initialise if credentials are missing or the container is not yet
-    // in the DOM.
-    if (error || appID === null || !containerRef.current) return;
+    if (error || appID === null || !containerRef.current || !joinReady) return;
 
     let destroyed = false;
-    let zp: { destroy: () => void; joinRoom: (options: any) => void } | null =
+    let zp: { destroy: () => void; joinRoom: (options: Record<string, unknown>) => void } | null =
       null;
 
     (async () => {
@@ -58,14 +62,10 @@ export default function ConsultationRoom({
 
       if (destroyed || !containerRef.current) return;
 
-      /**
-       * generateKitTokenForTest uses the App Sign directly in the browser.
-       * Use a server-generated token for production deployments.
-       */
       const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
         appID,
-        appSign, // called "serverSecret" in the JS SDK docs
-        appointmentId, // roomID – participants with the same ID enter the same room
+        appSign,
+        appointmentId,
         userID,
         userName
       );
@@ -77,40 +77,45 @@ export default function ConsultationRoom({
         scenario: {
           mode: ZegoUIKitPrebuilt.OneONoneCall,
         },
-        /**
-         * Navigate back to the previous screen when the local user leaves the
-         * call via the "Leave" button or the room is otherwise closed.
-         */
         onLeaveRoom: () => {
-          if (!leaveRecordedRef.current) {
-            leaveRecordedRef.current = true;
-            void recordConsultationLeave(appointmentId).catch(() => {});
-          }
-          onLeave?.();
+          if (leaveRecordedRef.current) return;
+          leaveRecordedRef.current = true;
+          void (async () => {
+            let result: ConsultationLeaveResult | undefined;
+            try {
+              result = await recordConsultationLeave(appointmentId);
+            } catch {
+              /* ignore */
+            }
+            onLeave?.(result);
+          })();
         },
       });
     })();
 
-    // Cleanup: destroy the ZEGOCLOUD instance when the component unmounts so
-    // camera and microphone tracks are properly released.
     return () => {
       destroyed = true;
       zp?.destroy();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appID, appSign, appointmentId, userID, userName, onLeave]);
+  }, [appID, appSign, appointmentId, userID, userName, onLeave, error, joinReady]);
 
-  // ── Credential error guard ─────────────────────────────────────────────────
-  if (error) {
+  if (error || joinError) {
     return (
       <div style={errorContainerStyle}>
         <p style={errorTitleStyle}>Configuration Error</p>
-        <p style={errorBodyStyle}>{error}</p>
+        <p style={errorBodyStyle}>{error ?? joinError}</p>
       </div>
     );
   }
 
-  // ── Video call container ───────────────────────────────────────────────────
+  if (!joinReady) {
+    return (
+      <div style={loadingStyle}>
+        <p style={{ color: '#e2e8f0' }}>Connecting video call…</p>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -119,7 +124,13 @@ export default function ConsultationRoom({
   );
 }
 
-// ─── Inline styles (no StyleSheet on web) ────────────────────────────────────
+const loadingStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  height: '100vh',
+  backgroundColor: '#0f172a',
+};
 
 const errorContainerStyle: React.CSSProperties = {
   display: 'flex',

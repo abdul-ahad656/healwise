@@ -59,34 +59,36 @@ def filter_future_slots(day: str, slots: list, now: Optional[datetime] = None) -
     return cleaned
 
 
+def _parse_utc_timestamp(value) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        return datetime.fromisoformat(value.replace("Z", ""))
+    return None
+
+
 def recompute_overlap_duration_seconds(appointment: dict) -> int:
-    """Overlap between patient and doctor when both joined and left."""
-    keys = (
-        ("patientJoinedAt", "patientLeftAt"),
-        ("doctorJoinedAt", "doctorLeftAt"),
-    )
-    parsed = []
-    for join_key, leave_key in keys:
-        joined = appointment.get(join_key)
-        left = appointment.get(leave_key)
-        if not joined or not left:
-            return int(appointment.get("consultationDurationSeconds") or 0)
-        if hasattr(joined, "isoformat"):
-            joined = joined
-        if hasattr(left, "isoformat"):
-            left = left
-        if isinstance(joined, str):
-            joined = datetime.fromisoformat(joined.replace("Z", ""))
-        if isinstance(left, str):
-            left = datetime.fromisoformat(left.replace("Z", ""))
-        parsed.append((joined, left))
+    """
+    Overlap while both patient and doctor are in the call.
+    Uses utcnow() when a party has joined but not left yet (e.g. other side ended first).
+    """
+    stored = int(appointment.get("consultationDurationSeconds") or 0)
 
-    if len(parsed) != 2:
-        return int(appointment.get("consultationDurationSeconds") or 0)
+    p_join = _parse_utc_timestamp(appointment.get("patientJoinedAt"))
+    d_join = _parse_utc_timestamp(appointment.get("doctorJoinedAt"))
+    if not p_join or not d_join:
+        return stored
 
-    (p_join, p_leave), (d_join, d_leave) = parsed
+    now = datetime.utcnow()
+    p_end = _parse_utc_timestamp(appointment.get("patientLeftAt")) or now
+    d_end = _parse_utc_timestamp(appointment.get("doctorLeftAt")) or now
+
     overlap_start = max(p_join, d_join)
-    overlap_end = min(p_leave, d_leave)
+    overlap_end = min(p_end, d_end)
     if overlap_end <= overlap_start:
-        return 0
-    return int((overlap_end - overlap_start).total_seconds())
+        return stored
+
+    computed = int((overlap_end - overlap_start).total_seconds())
+    return max(computed, stored)

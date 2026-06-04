@@ -23,7 +23,6 @@ import {
   cancelAppointment,
   rescheduleAppointment,
   markAppointmentComplete,
-  recordConsultationLeave,
   Appointment,
 } from '@/services/doctorPanelService';
 import { isPastAppointment } from '@/utils/appointmentHistory';
@@ -155,26 +154,31 @@ export default function AppointmentsScreen() {
   const activeCallRef = React.useRef<CallState | null>(activeCall);
   activeCallRef.current = activeCall;
 
-  const handleCallEnded = useCallback(() => {
-    const endedId = activeCallRef.current?.appointmentId;
-    setActiveCall(null);
-    if (!endedId) return;
-    void (async () => {
-      try {
-        const result = await recordConsultationLeave(endedId);
+  const handleCallEnded = useCallback(
+    (result?: {
+      consultationDurationMinutes?: number;
+      autoCompleted?: boolean;
+    }) => {
+      setActiveCall(null);
+      void (async () => {
         await loadAppointments();
-        if (result.autoCompleted) {
+        if (result?.autoCompleted) {
           Alert.alert(
             t('appointments_title'),
             'Consultation recorded and marked complete.'
           );
+          return;
         }
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Failed to save call';
-        Alert.alert('Error', message);
-      }
-    })();
-  }, [t]);
+        if (result?.consultationDurationMinutes) {
+          Alert.alert(
+            t('appointments_title'),
+            `Consultation recorded: ${result.consultationDurationMinutes} min.`
+          );
+        }
+      })();
+    },
+    [t, loadAppointments]
+  );
 
   const formatDate = (dateString: string) => {
     try {

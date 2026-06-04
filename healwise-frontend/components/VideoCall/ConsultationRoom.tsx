@@ -1,21 +1,28 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
-import { PhoneOff } from 'lucide-react-native';
+import { View, Text, StyleSheet, ActivityIndicator, LogBox } from 'react-native';
 import { useZegoConfig } from '@/hooks/useZegoConfig';
 import {
   recordConsultationJoin,
   recordConsultationLeave,
 } from '@/services/doctorPanelService';
+import type { ConsultationLeaveResult } from '@/types/consultation';
+
+export type { ConsultationLeaveResult };
 
 export interface ConsultationRoomProps {
   appointmentId: string;
   userID: string;
   userName: string;
-  /** Called when the call ends — parent should clear call state. */
-  onLeave?: () => void;
+  /** Called after leave is recorded — parent should clear call state. */
+  onLeave?: (result?: ConsultationLeaveResult) => void;
 }
 
 type ZegoCallModule = typeof import('@zegocloud/zego-uikit-prebuilt-call-rn');
+
+const ZEGO_LOG_IGNORE = [
+  'SafeAreaView has been deprecated',
+  'componentWillReceiveProps has been renamed',
+];
 
 export default function ConsultationRoom({
   appointmentId,
@@ -26,14 +33,36 @@ export default function ConsultationRoom({
   const { appID, appSign, error } = useZegoConfig();
   const [zego, setZego] = useState<ZegoCallModule | null>(null);
   const [zegoLoadError, setZegoLoadError] = useState<string | null>(null);
-  const callRef = useRef<{ hangUp?: (showConfirmation?: boolean) => void } | null>(
-    null
-  );
+  const [joinReady, setJoinReady] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
   const hasLeftRef = useRef(false);
   const leaveRecordedRef = useRef(false);
 
   useEffect(() => {
-    recordConsultationJoin(appointmentId).catch(() => {});
+    LogBox.ignoreLogs(ZEGO_LOG_IGNORE);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setJoinReady(false);
+    setJoinError(null);
+
+    (async () => {
+      try {
+        await recordConsultationJoin(appointmentId);
+        if (!cancelled) setJoinReady(true);
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setJoinError(
+            err instanceof Error ? err.message : 'Could not register for consultation'
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [appointmentId]);
 
   useEffect(() => {
@@ -54,35 +83,32 @@ export default function ConsultationRoom({
     };
   }, []);
 
-  const finishCall = useCallback(() => {
+  const finishCall = useCallback(async () => {
     if (hasLeftRef.current) return;
     hasLeftRef.current = true;
+
+    let result: ConsultationLeaveResult | undefined;
     if (!leaveRecordedRef.current) {
       leaveRecordedRef.current = true;
-      void recordConsultationLeave(appointmentId).catch(() => {});
+      try {
+        result = await recordConsultationLeave(appointmentId);
+      } catch {
+        // Parent may still refresh; duration can be reconciled on next load.
+      }
     }
-    onLeave?.();
+    onLeave?.(result);
   }, [appointmentId, onLeave]);
 
-  const handleEndCallPress = useCallback(() => {
-    try {
-      callRef.current?.hangUp?.(false);
-    } catch {
-      // Room may already be disconnected — still exit the screen.
-    }
-    finishCall();
-  }, [finishCall]);
-
-  if (error || zegoLoadError) {
+  if (error || zegoLoadError || joinError) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorTitle}>Configuration Error</Text>
-        <Text style={styles.errorBody}>{error ?? zegoLoadError}</Text>
+        <Text style={styles.errorBody}>{error ?? zegoLoadError ?? joinError}</Text>
       </View>
     );
   }
 
-  if (appID === null || !zego) {
+  if (appID === null || !zego || !joinReady) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#22c55e" />
@@ -96,7 +122,6 @@ export default function ConsultationRoom({
   return (
     <View style={styles.container}>
       <ZegoUIKitPrebuiltCall
-        ref={callRef}
         appID={appID}
         appSign={appSign}
         userID={userID}
@@ -104,25 +129,18 @@ export default function ConsultationRoom({
         callID={appointmentId}
         config={{
           ...ONE_ON_ONE_VIDEO_CALL_CONFIG,
-          /** Zego RN uses onCallEnd (not onHangUp) when the user or remote party leaves. */
+          hangUpConfirmDialogInfo: {
+            title: 'End consultation?',
+            message:
+              'Leave the video call? Your consultation time is saved when you end the call.',
+            cancelButtonName: 'Stay',
+            confirmButtonName: 'End call',
+          },
           onCallEnd: () => {
-            finishCall();
+            void finishCall();
           },
         }}
       />
-
-      <Pressable
-        onPress={handleEndCallPress}
-        style={({ pressed }) => [
-          styles.endCallButton,
-          { opacity: pressed ? 0.85 : 1 },
-        ]}
-        accessibilityLabel="End call"
-        accessibilityRole="button"
-      >
-        <PhoneOff size={20} color="#ffffff" />
-        <Text style={styles.endCallText}>End call</Text>
-      </Pressable>
     </View>
   );
 }
@@ -139,25 +157,6 @@ const styles = StyleSheet.create({
   loadingText: {
     color: '#e2e8f0',
     fontSize: 14,
-  },
-  endCallButton: {
-    position: 'absolute',
-    top: 52,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: 'rgba(220, 38, 38, 0.95)',
-    zIndex: 9999,
-    elevation: 10,
-  },
-  endCallText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
   },
   errorContainer: {
     flex: 1,

@@ -305,10 +305,9 @@ def record_consultation_join(appointment_id: str):
         return jsonify({"error": "Appointment is not active"}), 400
 
     join_field = "patientJoinedAt" if role == "patient" else "doctorJoinedAt"
-    update = {
-        join_field: datetime.utcnow(),
-        "updatedAt": datetime.utcnow(),
-    }
+    update = {"updatedAt": datetime.utcnow()}
+    if not appointment.get(join_field):
+        update[join_field] = datetime.utcnow()
     if not appointment.get("consultationStartedAt"):
         update["consultationStartedAt"] = datetime.utcnow()
     if appointment.get("status") in ("accepted", "confirmed"):
