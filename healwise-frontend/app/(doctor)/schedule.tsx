@@ -21,6 +21,7 @@ import {
   deleteMyAvailabilityDay,
   DoctorAvailabilityDay,
 } from '@/services/doctorPanelService';
+import { isPastDay, isPastSlot } from '@/utils/scheduleValidation';
 
 const formatDayLabel = (day: string) => {
   const date = new Date(day);
@@ -162,7 +163,13 @@ export default function DoctorSchedule() {
             label="Add day"
             variant="primary"
             onPress={() => {
-              upsertLocalDay(dayInput);
+              const day = dayInput.trim();
+              if (!day) return;
+              if (isPastDay(day)) {
+                setError('Cannot add a past date. Choose today or a future date.');
+                return;
+              }
+              upsertLocalDay(day);
               setDayInput('');
             }}
           />
@@ -207,7 +214,13 @@ export default function DoctorSchedule() {
                 label="Add slot"
                 variant="outline"
                 onPress={() => {
-                  addSlotLocal(slotInput);
+                  const slot = slotInput.trim();
+                  if (!slot || !selectedDay) return;
+                  if (isPastSlot(selectedDay, slot)) {
+                    setError('This time has already passed. Choose a future slot.');
+                    return;
+                  }
+                  addSlotLocal(slot);
                   setSlotInput('');
                 }}
               />

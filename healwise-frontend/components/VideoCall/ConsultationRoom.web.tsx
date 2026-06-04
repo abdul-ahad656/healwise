@@ -1,5 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { useZegoConfig } from '@/hooks/useZegoConfig';
+import {
+  recordConsultationJoin,
+  recordConsultationLeave,
+} from '@/services/doctorPanelService';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -23,7 +27,18 @@ export default function ConsultationRoom({
   onLeave,
 }: ConsultationRoomProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const leaveRecordedRef = useRef(false);
   const { appID, appSign, error } = useZegoConfig();
+
+  useEffect(() => {
+    recordConsultationJoin(appointmentId).catch(() => {});
+    return () => {
+      if (!leaveRecordedRef.current) {
+        leaveRecordedRef.current = true;
+        recordConsultationLeave(appointmentId).catch(() => {});
+      }
+    };
+  }, [appointmentId]);
 
   useEffect(() => {
     // SSR guard: expo-router web SSR runs in Node where `document` doesn't exist.
@@ -66,7 +81,13 @@ export default function ConsultationRoom({
          * Navigate back to the previous screen when the local user leaves the
          * call via the "Leave" button or the room is otherwise closed.
          */
-        onLeaveRoom: () => onLeave?.(),
+        onLeaveRoom: () => {
+          if (!leaveRecordedRef.current) {
+            leaveRecordedRef.current = true;
+            void recordConsultationLeave(appointmentId).catch(() => {});
+          }
+          onLeave?.();
+        },
       });
     })();
 

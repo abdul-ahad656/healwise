@@ -24,8 +24,14 @@ export interface Appointment {
     | 'confirmed'
     | 'in_progress'
     | 'rejected'
-    | 'completed';
+    | 'completed'
+    | 'cancelled';
   hasPrescription?: boolean;
+  consultationDurationSeconds?: number;
+  consultationDurationMinutes?: number;
+  patientMarkedComplete?: boolean;
+  doctorMarkedComplete?: boolean;
+  completionType?: string;
 }
 
 export interface SymptomHistoryItem {
@@ -127,6 +133,86 @@ export const updateAppointmentStatus = async (
   if (!response.ok) {
     throw new Error(data.error || 'Failed to update appointment');
   }
+};
+
+export const cancelAppointment = async (appointmentId: string): Promise<void> => {
+  const headers = getAuthHeaders();
+  const response = await fetch(
+    `${API_BASE_URL}/appointments/${appointmentId}/cancel`,
+    { method: 'POST', headers }
+  );
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to cancel appointment');
+  }
+};
+
+export const rescheduleAppointment = async (
+  appointmentId: string,
+  appointmentDate: string,
+  appointmentTime: string
+): Promise<void> => {
+  const headers = getAuthHeaders();
+  const response = await fetch(
+    `${API_BASE_URL}/appointments/${appointmentId}/reschedule`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ appointmentDate, appointmentTime }),
+    }
+  );
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to reschedule appointment');
+  }
+};
+
+export const markAppointmentComplete = async (
+  appointmentId: string
+): Promise<Appointment> => {
+  const headers = getAuthHeaders();
+  const response = await fetch(
+    `${API_BASE_URL}/appointments/${appointmentId}/mark-complete`,
+    { method: 'POST', headers }
+  );
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to mark appointment complete');
+  }
+  return data.appointment as Appointment;
+};
+
+export const recordConsultationJoin = async (
+  appointmentId: string
+): Promise<void> => {
+  const headers = getAuthHeaders();
+  const response = await fetch(
+    `${API_BASE_URL}/appointments/${appointmentId}/consultation-join`,
+    { method: 'POST', headers }
+  );
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to record consultation join');
+  }
+};
+
+export const recordConsultationLeave = async (
+  appointmentId: string
+): Promise<{
+  consultationDurationMinutes?: number;
+  status?: string;
+  autoCompleted?: boolean;
+}> => {
+  const headers = getAuthHeaders();
+  const response = await fetch(
+    `${API_BASE_URL}/appointments/${appointmentId}/consultation-leave`,
+    { method: 'POST', headers }
+  );
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to record consultation leave');
+  }
+  return data;
 };
 
 export const startConsultation = async (

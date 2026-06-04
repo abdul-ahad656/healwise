@@ -15,6 +15,14 @@ _DATETIME_KEYS = (
     "updatedAt",
     "consultationStartedAt",
     "bookedAt",
+    "patientJoinedAt",
+    "patientLeftAt",
+    "doctorJoinedAt",
+    "doctorLeftAt",
+    "completedAt",
+    "cancelledAt",
+    "rescheduledAt",
+    "autoCompletedAt",
 )
 
 _ID_KEYS = ("scheduleId", "patientId", "doctorId", "symptomId", "paymentId")
@@ -158,6 +166,8 @@ def book_appointment():
 
 
 def get_my_appointments():
+    from app.controllers.appointment_actions import try_auto_complete_appointment
+
     user_id = get_jwt_identity()
     appointments = list(
         mongo.db.appointments.find(_patient_appointments_query(user_id))
@@ -165,16 +175,22 @@ def get_my_appointments():
 
     payload = []
     for a in appointments:
+        a = try_auto_complete_appointment(a)
         row = _serialize_appointment_for_response(a)
         doctor = find_user_by_id(row.get("doctorId"))
         if doctor:
             row["doctorName"] = doctor.get("name") or doctor.get("email")
+        row["consultationDurationMinutes"] = round(
+            int(row.get("consultationDurationSeconds") or 0) / 60.0, 1
+        )
         payload.append(row)
 
     return jsonify(payload), 200
 
 
 def doctor_appointments():
+    from app.controllers.appointment_actions import try_auto_complete_appointment
+
     doctor_id = get_jwt_identity()
     appointments = list(
         mongo.db.appointments.find(_doctor_appointments_query(doctor_id))
@@ -182,26 +198,32 @@ def doctor_appointments():
 
     payload = []
     for a in appointments:
+        a = try_auto_complete_appointment(a)
         row = _serialize_appointment_for_response(a)
         patient = find_user_by_id(row.get("patientId"))
         if patient:
             row["patientName"] = patient.get("name") or patient.get("email")
         row["hasPrescription"] = _prescription_exists_for_appointment(row["_id"])
+        row["consultationDurationMinutes"] = round(
+            int(row.get("consultationDurationSeconds") or 0) / 60.0, 1
+        )
         payload.append(row)
 
     return jsonify(payload), 200
 
 
 def update_appointment_status(appointment_id):
-    data = request.json
+    data = request.json or {}
     status = data.get("status")
 
-    if status not in ["accepted", "rejected", "completed", "in_progress"]:
-        return jsonify({"error": "Invalid status"}), 400
+    if status not in ["accepted", "rejected", "in_progress"]:
+        return jsonify({
+            "error": "Invalid status. Use mark-complete endpoint for completed."
+        }), 400
 
     mongo.db.appointments.update_one(
         {"_id": ObjectId(appointment_id)},
-        {"$set": {"status": status, "updatedAt": datetime.utcnow()}}
+        {"$set": {"status": status, "updatedAt": datetime.utcnow()}},
     )
 
     return jsonify({"message": f"Appointment {status}"}), 200
@@ -241,7 +263,7 @@ def start_consultation(appointment_id):
             appointment["appointmentDate"],
             appointment["appointmentTime"],
         )
-        now = datetime.now()
+        now = datetime.now(TZ).replace(tzinfo=None)
         time_until = (appt_start - now).total_seconds() / 60
 
         if time_until > 5:

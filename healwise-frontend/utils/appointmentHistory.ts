@@ -1,7 +1,11 @@
 import type { Appointment } from '@/services/doctorPanelService';
 import { getAppointmentWindow } from '@/utils/consultationTime';
 
-const TERMINAL_STATUSES = new Set<Appointment['status']>(['completed', 'rejected']);
+const TERMINAL_STATUSES = new Set<Appointment['status']>([
+  'completed',
+  'rejected',
+  'cancelled',
+]);
 
 /** True when the appointment is finished or its scheduled window has ended. */
 export function isPastAppointment(

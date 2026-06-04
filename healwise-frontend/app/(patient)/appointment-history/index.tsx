@@ -43,6 +43,8 @@ function getStatusColor(status: string) {
       return { bg: '#fee2e2', border: '#fecaca', text: '#b91c1c' };
     case 'completed':
       return { bg: '#e0e7ff', border: '#c7d2fe', text: '#3730a3' };
+    case 'cancelled':
+      return { bg: '#f3f4f6', border: '#e5e7eb', text: '#6b7280' };
     default:
       return { bg: '#f3f4f6', border: '#e5e7eb', text: '#4b5563' };
   }
@@ -196,6 +198,15 @@ export default function AppointmentHistoryScreen() {
                   </View>
                 </View>
 
+                {appointment.consultationDurationMinutes != null &&
+                appointment.consultationDurationMinutes > 0 ? (
+                  <Text style={styles.metaLine}>
+                    Consultation: {appointment.consultationDurationMinutes} min
+                    {appointment.completionType === 'auto_duration'
+                      ? ' (auto-completed)'
+                      : ''}
+                  </Text>
+                ) : null}
                 {appointment.hasPrescription ? (
                   <Text style={styles.prescriptionHint}>
                     {t('appointment_history_has_prescription')}
@@ -299,6 +310,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
     lineHeight: 20,
+  },
+  metaLine: {
+    marginTop: 10,
+    fontSize: 12,
+    color: '#6b7280',
   },
   prescriptionHint: {
     marginTop: 12,

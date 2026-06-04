@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Video, Calendar, Clock, User } from 'lucide-react-native';
@@ -15,8 +16,18 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Card } from '@/components/ui/card';
 import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
+import { PatientPrimaryButton } from '@/components/patient/PatientPrimaryButton';
 import ConsultationRoom from '@/components/VideoCall/ConsultationRoom';
-import { getPatientAppointments, Appointment } from '@/services/doctorPanelService';
+import {
+  getPatientAppointments,
+  cancelAppointment,
+  rescheduleAppointment,
+  markAppointmentComplete,
+  recordConsultationLeave,
+  Appointment,
+} from '@/services/doctorPanelService';
+import { isPastAppointment } from '@/utils/appointmentHistory';
+import { PLACEHOLDER_COLOR } from '@/styles/patientScreen';
 import AuthStore from '@/services/authStore';
 import { patientScreenStyles as s } from '@/styles/patientScreen';
 import {
@@ -73,6 +84,9 @@ export default function AppointmentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeCall, setActiveCall] = useState<CallState | null>(null);
+  const [rescheduleId, setRescheduleId] = useState<string | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
 
   useEffect(() => {
     loadAppointments();
@@ -82,11 +96,16 @@ export default function AppointmentsScreen() {
     try {
       setError(null);
       const data = await getPatientAppointments();
+      const upcoming = data.filter(
+        (a) =>
+          !['completed', 'cancelled', 'rejected'].includes(a.status) &&
+          !isPastAppointment(a)
+      );
       setAppointments(
-        data.sort(
+        upcoming.sort(
           (a, b) =>
-            new Date(b.appointmentDate).getTime() -
-            new Date(a.appointmentDate).getTime()
+            new Date(a.appointmentDate).getTime() -
+            new Date(b.appointmentDate).getTime()
         )
       );
     } catch (err: unknown) {
@@ -133,9 +152,29 @@ export default function AppointmentsScreen() {
     });
   };
 
+  const activeCallRef = React.useRef<CallState | null>(activeCall);
+  activeCallRef.current = activeCall;
+
   const handleCallEnded = useCallback(() => {
+    const endedId = activeCallRef.current?.appointmentId;
     setActiveCall(null);
-  }, []);
+    if (!endedId) return;
+    void (async () => {
+      try {
+        const result = await recordConsultationLeave(endedId);
+        await loadAppointments();
+        if (result.autoCompleted) {
+          Alert.alert(
+            t('appointments_title'),
+            'Consultation recorded and marked complete.'
+          );
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to save call';
+        Alert.alert('Error', message);
+      }
+    })();
+  }, [t]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -165,6 +204,8 @@ export default function AppointmentsScreen() {
         return { bg: '#fee2e2', border: '#fecaca', text: '#b91c1c' };
       case 'completed':
         return { bg: '#e0e7ff', border: '#c7d2fe', text: '#3730a3' };
+      case 'cancelled':
+        return { bg: '#f3f4f6', border: '#e5e7eb', text: '#6b7280' };
       default:
         return { bg: '#f3f4f6', border: '#e5e7eb', text: '#4b5563' };
     }
@@ -305,6 +346,113 @@ export default function AppointmentsScreen() {
                     </Text>
                   </View>
                 )}
+
+                {(appointment.status === 'accepted' ||
+                  appointment.status === 'confirmed' ||
+                  appointment.status === 'in_progress') && (
+                  <View style={local.actionsCol}>
+                    <PatientPrimaryButton
+                      label="Mark consultation complete"
+                      variant="primary"
+                      onPress={async () => {
+                        try {
+                          await markAppointmentComplete(appointment._id);
+                          await loadAppointments();
+                        } catch (err: unknown) {
+                          Alert.alert(
+                            'Error',
+                            err instanceof Error ? err.message : 'Failed'
+                          );
+                        }
+                      }}
+                    />
+                    <PatientPrimaryButton
+                      label={
+                        rescheduleId === appointment._id
+                          ? 'Hide reschedule'
+                          : 'Reschedule'
+                      }
+                      variant="outline"
+                      onPress={() => {
+                        if (rescheduleId === appointment._id) {
+                          setRescheduleId(null);
+                        } else {
+                          setRescheduleId(appointment._id);
+                          setRescheduleDate(appointment.appointmentDate);
+                          setRescheduleTime(appointment.appointmentTime);
+                        }
+                      }}
+                    />
+                    <PatientPrimaryButton
+                      label="Cancel appointment"
+                      variant="danger"
+                      onPress={() => {
+                        Alert.alert('Cancel', 'Cancel this appointment?', [
+                          { text: 'No', style: 'cancel' },
+                          {
+                            text: 'Yes',
+                            style: 'destructive',
+                            onPress: async () => {
+                              try {
+                                await cancelAppointment(appointment._id);
+                                await loadAppointments();
+                              } catch (err: unknown) {
+                                Alert.alert(
+                                  'Error',
+                                  err instanceof Error ? err.message : 'Failed'
+                                );
+                              }
+                            },
+                          },
+                        ]);
+                      }}
+                    />
+                  </View>
+                )}
+
+                {rescheduleId === appointment._id ? (
+                  <View style={local.rescheduleBox}>
+                    <Text style={local.detailLabel}>New date (YYYY-MM-DD)</Text>
+                    <TextInput
+                      style={local.rescheduleInput}
+                      value={rescheduleDate}
+                      onChangeText={setRescheduleDate}
+                      placeholder="2026-05-25"
+                      placeholderTextColor={PLACEHOLDER_COLOR}
+                    />
+                    <Text style={[local.detailLabel, { marginTop: 8 }]}>
+                      New time slot
+                    </Text>
+                    <TextInput
+                      style={local.rescheduleInput}
+                      value={rescheduleTime}
+                      onChangeText={setRescheduleTime}
+                      placeholder="10:30 - 13:00"
+                      placeholderTextColor={PLACEHOLDER_COLOR}
+                    />
+                    <PatientPrimaryButton
+                      label="Save reschedule"
+                      variant="primary"
+                      onPress={async () => {
+                        try {
+                          await rescheduleAppointment(
+                            appointment._id,
+                            rescheduleDate.trim(),
+                            rescheduleTime.trim()
+                          );
+                          setRescheduleId(null);
+                          await loadAppointments();
+                        } catch (err: unknown) {
+                          Alert.alert(
+                            'Error',
+                            err instanceof Error ? err.message : 'Failed'
+                          );
+                        }
+                      }}
+                      style={{ marginTop: 8 }}
+                    />
+                  </View>
+                ) : null}
               </Card>
             );
           })
@@ -459,5 +607,25 @@ const local = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  actionsCol: { marginTop: 12, gap: 8 },
+  rescheduleBox: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  rescheduleInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#fff',
+    marginTop: 4,
   },
 });

@@ -30,6 +30,14 @@ from app.services.payment_service import (
     validate_payment_method,
 )
 from app.services.cloudinary_service import upload_payment_proof_to_cloudinary
+from app.utils.slot_locking import (
+    SlotUnavailableError,
+    acquire_slot_lock,
+    attach_payment_to_lock,
+    create_appointment_from_payment,
+    release_slot_lock,
+    release_slot_lock_for_payment,
+)
 import os
 
 
@@ -158,18 +166,14 @@ def create_payment_handler():
         if not slot_exists:
             return jsonify({"error": "Selected slot not available for doctor"}), 400
 
-        # Check no conflicting appointments
-        existing = mongo.db.appointments.find_one({
-            "doctorId": doctor_id,
-            "appointmentDate": appointment_date,
-            "appointmentTime": appointment_time,
-            "status": {"$in": ["pending", "accepted", "confirmed"]}
-        })
+        from app.utils.appointment_scheduling import is_past_day, is_past_slot
 
-        if existing:
-            return jsonify({"error": "Doctor is already booked at this time"}), 409
+        if is_past_day(appointment_date) or is_past_slot(
+            appointment_date, appointment_time
+        ):
+            return jsonify({"error": "Cannot book a slot in the past"}), 400
 
-        # Check no active payment for this appointment already
+        # Check no active payment for this booking reference
         try:
             if check_active_payment_for_appointment(appointment_id):
                 return jsonify({
@@ -177,6 +181,18 @@ def create_payment_handler():
                 }), 409
         except Exception as e:
             return jsonify({"error": f"Failed to check active payments: {str(e)}"}), 500
+
+        # Atomic slot hold (blocks concurrent payments for the same slot)
+        try:
+            acquire_slot_lock(
+                doctor_id,
+                appointment_date,
+                appointment_time,
+                user_id,
+                payment_method=payment_method,
+            )
+        except SlotUnavailableError as e:
+            return jsonify({"error": str(e)}), 409
 
         # Route based on payment method
         if payment_method == "stripe":
@@ -206,6 +222,7 @@ def create_payment_handler():
                 symptom_id,
             )
         else:
+            release_slot_lock(doctor_id, appointment_date, appointment_time)
             return jsonify({"error": "Unsupported payment method"}), 400
 
     except Exception as e:
@@ -225,6 +242,10 @@ def _handle_stripe_payment(
     symptom_id,
 ):
     """Handle Stripe payment method."""
+
+    def _release_hold():
+        release_slot_lock(doctor_id, appointment_date, appointment_time)
+
     try:
 
         # Create Stripe PaymentIntent
@@ -240,6 +261,7 @@ def _handle_stripe_payment(
                 }
             )
         except StripeServiceError as e:
+            _release_hold()
             return jsonify({"error": f"Payment service error: {str(e)}"}), 503
 
         # Create payment record in MongoDB
@@ -271,7 +293,16 @@ def _handle_stripe_payment(
         try:
             payment_id = create_payment(payment_doc)
         except Exception as e:
+            _release_hold()
             return jsonify({"error": f"Failed to save payment: {str(e)}"}), 500
+
+        attach_payment_to_lock(
+            doctor_id,
+            appointment_date,
+            appointment_time,
+            payment_id,
+            "stripe",
+        )
 
         return jsonify({
             "payment_method": "stripe",
@@ -284,6 +315,7 @@ def _handle_stripe_payment(
         }), 200
 
     except Exception as e:
+        _release_hold()
         return jsonify({"error": f"Stripe payment error: {str(e)}"}), 500
 
 
@@ -300,6 +332,10 @@ def _handle_easypaisa_payment(
     symptom_id,
 ):
     """Handle Easypaisa manual payment method."""
+
+    def _release_hold():
+        release_slot_lock(doctor_id, appointment_date, appointment_time)
+
     try:
         receiver_number = current_app.config.get("EASYPAISA_RECEIVER_NUMBER")
 
@@ -330,7 +366,16 @@ def _handle_easypaisa_payment(
         try:
             payment_id = create_payment(payment_doc)
         except Exception as e:
+            _release_hold()
             return jsonify({"error": f"Failed to create payment record: {str(e)}"}), 500
+
+        attach_payment_to_lock(
+            doctor_id,
+            appointment_date,
+            appointment_time,
+            payment_id,
+            "easypaisa",
+        )
 
         return jsonify({
             "payment_method": "easypaisa",
@@ -349,6 +394,7 @@ def _handle_easypaisa_payment(
         }), 200
 
     except Exception as e:
+        _release_hold()
         return jsonify({"error": f"Easypaisa payment error: {str(e)}"}), 500
 
 
@@ -486,50 +532,29 @@ def admin_confirm_payment_handler():
                 "error": "Only Easypaisa payments can be manually confirmed"
             }), 400
 
-        # Update payment to paid
+        booked_id, book_err = create_appointment_from_payment(payment)
+        if book_err:
+            return jsonify({
+                "error": (
+                    f"Cannot confirm payment: {book_err}. "
+                    "The slot may have been taken. Reject this payment or ask the patient to pick another slot."
+                )
+            }), 409
+
         try:
             update_payment_to_paid(payment_id_obj, admin_notes)
         except Exception as e:
             return jsonify({"error": f"Failed to confirm payment: {str(e)}"}), 500
 
-        # Create appointment record from payment details
-        try:
-            appointment_date = payment.get("metadata", {}).get("appointmentDate")
-            appointment_time = payment.get("metadata", {}).get("appointmentTime")
-            doctor_id = payment.get("doctorId")
-            patient_id = payment.get("userId")
-            symptom_id = payment.get("metadata", {}).get("symptomId")
-
-            if not all([appointment_date, appointment_time, doctor_id, patient_id]):
-                current_app.logger.error(f"Missing appointment data in payment: {payment_id}")
-                return jsonify({"error": "Cannot create appointment: missing payment details"}), 400
-
-            # Create appointment
-            appointment = {
-                "patientId": patient_id,
-                "doctorId": doctor_id,
-                "symptomId": symptom_id,
-                "appointmentDate": appointment_date,
-                "appointmentTime": appointment_time,
-                "status": "accepted",
-                "paymentStatus": "paid",
-                "paymentId": payment_id_obj,
-                "createdAt": datetime.utcnow(),
-                "updatedAt": datetime.utcnow()
-            }
-
-            result = mongo.db.appointments.insert_one(appointment)
-            appointment_id = str(result.inserted_id)
-
-            # Link appointment back to payment
-            mongo.db.payments.update_one(
-                {"_id": payment_id_obj},
-                {"$set": {"appointmentRecordId": ObjectId(appointment_id)}}
-            )
-
-        except Exception as e:
-            current_app.logger.error(f"Failed to create appointment: {str(e)}")
-            return jsonify({"error": f"Payment confirmed but failed to create appointment: {str(e)}"}), 500
+        appointment_id = booked_id
+        if booked_id:
+            try:
+                mongo.db.payments.update_one(
+                    {"_id": payment_id_obj},
+                    {"$set": {"appointmentRecordId": ObjectId(booked_id)}},
+                )
+            except Exception as e:
+                current_app.logger.error(f"Failed to link appointment to payment: {str(e)}")
 
         return jsonify({
             "message": "Payment confirmed successfully. Booking is now active.",
@@ -580,6 +605,8 @@ def admin_reject_payment_handler():
             update_payment_to_rejected(payment_id_obj, admin_notes)
         except Exception as e:
             return jsonify({"error": f"Failed to reject payment: {str(e)}"}), 500
+
+        release_slot_lock_for_payment(payment)
 
         return jsonify({
             "message": "Payment rejected. No appointment was created.",
@@ -676,36 +703,15 @@ def handle_webhook():
                 print(f"Failed to update payment status: {str(e)}")
                 return jsonify({"status": "received"}), 200
 
-            # Create appointment record after successful payment (tracking id is not an ObjectId)
-            if not payment_has_booked_appointment(payment):
-                try:
-                    metadata = payment.get("metadata", {})
-                    appointment = {
-                        "patientId": payment["userId"],
-                        "doctorId": metadata.get("doctorId") or payment.get("doctorId"),
-                        "symptomId": metadata.get("symptomId"),
-                        "appointmentDate": metadata.get("appointmentDate"),
-                        "appointmentTime": metadata.get("appointmentTime"),
-                        "status": "accepted",
-                        "paymentId": str(payment_id),
-                        "paymentStatus": "paid",
-                        "requiresPayment": True,
-                        "trackingId": payment.get("appointmentTrackingId")
-                        or payment.get("appointmentId"),
-                        "createdAt": datetime.utcnow(),
-                    }
-
-                    result = mongo.db.appointments.insert_one(appointment)
-                    booked_id = result.inserted_id
-
-                    update_payment_status(
-                        payment_id,
-                        "paid",
-                        {"appointmentRecordId": booked_id},
-                    )
-
-                except Exception as e:
-                    print(f"Failed to create appointment after payment: {str(e)}")
+            booked_id, book_err = create_appointment_from_payment(payment)
+            if booked_id:
+                update_payment_status(
+                    payment_id,
+                    "paid",
+                    {"appointmentRecordId": ObjectId(booked_id)},
+                )
+            elif book_err:
+                print(f"Failed to create appointment after payment: {book_err}")
 
         # Handle payment_intent.payment_failed
         elif event_type == "payment_intent.payment_failed":
@@ -717,6 +723,7 @@ def handle_webhook():
                     "failed",
                     {"failureReason": failure_message}
                 )
+                release_slot_lock_for_payment(payment)
             except Exception as e:
                 print(f"Failed to update failed payment: {str(e)}")
 
@@ -848,6 +855,8 @@ def refund_payment_handler():
                 )
             except:
                 pass
+
+        release_slot_lock_for_payment(payment)
 
         return jsonify({
             "refundId": stripe_refund.id,

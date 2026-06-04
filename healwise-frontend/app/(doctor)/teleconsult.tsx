@@ -16,7 +16,7 @@ import ConsultationRoom from '@/components/VideoCall/ConsultationRoom';
 import {
   getDoctorAppointments,
   startConsultation,
-  updateAppointmentStatus,
+  recordConsultationLeave,
   Appointment,
 } from '@/services/doctorPanelService';
 import AuthStore from '@/services/authStore';
@@ -55,27 +55,28 @@ export default function TeleconsultScreen() {
     return null;
   });
 
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        const data = await getDoctorAppointments();
-        setAppointments(
-          data
-            .filter((a) => isTeleconsultStatus(a.status))
-            .sort((a, b) => {
-              const dateCompare = b.appointmentDate.localeCompare(a.appointmentDate);
-              if (dateCompare !== 0) return dateCompare;
-              return a.appointmentTime.localeCompare(b.appointmentTime);
-            })
-        );
-      } catch (err: any) {
-        setError(err.message || 'Failed to load appointments');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAppointments();
+  const loadAppointments = useCallback(async () => {
+    try {
+      const data = await getDoctorAppointments();
+      setAppointments(
+        data
+          .filter((a) => isTeleconsultStatus(a.status))
+          .sort((a, b) => {
+            const dateCompare = b.appointmentDate.localeCompare(a.appointmentDate);
+            if (dateCompare !== 0) return dateCompare;
+            return a.appointmentTime.localeCompare(b.appointmentTime);
+          })
+      );
+    } catch (err: any) {
+      setError(err.message || 'Failed to load appointments');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadAppointments();
+  }, [loadAppointments]);
 
   const startCall = async (appointment: Appointment) => {
     const window = canStartTeleconsult(
@@ -123,37 +124,51 @@ export default function TeleconsultScreen() {
 
     void (async () => {
       try {
-        await updateAppointmentStatus(endedAppointmentId, 'completed');
-        setAppointments((prev) =>
-          prev.map((a) =>
-            a._id === endedAppointmentId ? { ...a, status: 'completed' } : a
-          )
+        const result = await recordConsultationLeave(endedAppointmentId);
+        await loadAppointments();
+        if (result.autoCompleted) {
+          Alert.alert(
+            'Consultation completed',
+            'Call duration was recorded and the appointment was marked complete.',
+            [
+              { text: 'Later', style: 'cancel' },
+              {
+                text: 'Upload prescription',
+                onPress: () =>
+                  router.push({
+                    pathname: '/(doctor)/upload-prescription',
+                    params: { appointmentId: endedAppointmentId },
+                  }),
+              },
+            ]
+          );
+          return;
+        }
+        Alert.alert(
+          'Consultation ended',
+          result.consultationDurationMinutes
+            ? `Recorded ${result.consultationDurationMinutes} min. Mark complete from Appointments when ready, or wait for patient confirmation / auto-complete after 30 min.`
+            : 'Duration is being recorded. Mark complete from Appointments after enough consultation time or patient confirmation.',
+          [
+            { text: 'OK', style: 'cancel' },
+            {
+              text: 'Upload prescription',
+              onPress: () =>
+                router.push({
+                  pathname: '/(doctor)/upload-prescription',
+                  params: { appointmentId: endedAppointmentId },
+                }),
+            },
+          ]
         );
       } catch (err: any) {
         Alert.alert(
-          'Could not update appointment',
-          err.message || 'The consultation ended but status could not be saved.'
+          'Could not save consultation',
+          err.message || 'The call ended but duration could not be saved.'
         );
-        return;
       }
-
-      Alert.alert(
-        'Consultation ended',
-        'Upload a prescription for this patient now?',
-        [
-          { text: 'Later', style: 'cancel' },
-          {
-            text: 'Upload prescription',
-            onPress: () =>
-              router.push({
-                pathname: '/(doctor)/upload-prescription',
-                params: { appointmentId: endedAppointmentId },
-              }),
-          },
-        ]
-      );
     })();
-  }, [router]);
+  }, [loadAppointments, router]);
 
   if (activeCall) {
     return (

@@ -223,6 +223,7 @@ const resources = {
       appointment_status_in_progress: "In progress",
       appointment_status_rejected: "Rejected",
       appointment_status_completed: "Completed",
+      appointment_status_cancelled: "Cancelled",
       appointments_join_ended: "This consultation window has ended",
       appointments_join_available_before:
         "Available {{early}} minutes before start ({{minutes}} min remaining)",
@@ -475,6 +476,7 @@ const resources = {
       appointment_status_in_progress: "جاری",
       appointment_status_rejected: "مسترد",
       appointment_status_completed: "مکمل",
+      appointment_status_cancelled: "منسوخ",
       appointments_join_ended: "مشورے کا وقت ختم ہو چکا ہے",
       appointments_join_available_before:
         "شروع سے {{early}} منٹ پہلے دستیاب ({{minutes}} منٹ باقی)",

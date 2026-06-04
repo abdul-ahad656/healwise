@@ -124,9 +124,11 @@ def create_app():
     with app.app_context():
         try:
             from app.services.symptom_service import ensure_patients_indexes
+            from app.utils.slot_locking import ensure_slot_lock_indexes
 
             if mongo.db is not None:
                 ensure_patients_indexes()
+                ensure_slot_lock_indexes()
         except Exception as e:
             print(f"⚠️ patients index warning: {e}")
 

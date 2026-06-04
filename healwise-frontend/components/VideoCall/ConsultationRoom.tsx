@@ -2,6 +2,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { PhoneOff } from 'lucide-react-native';
 import { useZegoConfig } from '@/hooks/useZegoConfig';
+import {
+  recordConsultationJoin,
+  recordConsultationLeave,
+} from '@/services/doctorPanelService';
 
 export interface ConsultationRoomProps {
   appointmentId: string;
@@ -26,6 +30,11 @@ export default function ConsultationRoom({
     null
   );
   const hasLeftRef = useRef(false);
+  const leaveRecordedRef = useRef(false);
+
+  useEffect(() => {
+    recordConsultationJoin(appointmentId).catch(() => {});
+  }, [appointmentId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,8 +57,12 @@ export default function ConsultationRoom({
   const finishCall = useCallback(() => {
     if (hasLeftRef.current) return;
     hasLeftRef.current = true;
+    if (!leaveRecordedRef.current) {
+      leaveRecordedRef.current = true;
+      void recordConsultationLeave(appointmentId).catch(() => {});
+    }
     onLeave?.();
-  }, [onLeave]);
+  }, [appointmentId, onLeave]);
 
   const handleEndCallPress = useCallback(() => {
     try {
