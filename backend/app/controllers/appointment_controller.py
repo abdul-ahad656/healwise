@@ -118,8 +118,17 @@ def get_my_appointments():
 
     for a in appointments:
         a["_id"] = str(a["_id"])
-        if "scheduleId" in a:
-            a["scheduleId"] = str(a["scheduleId"])
+
+        if "scheduleId" in a and a["scheduleId"]:
+            if not isinstance(a["scheduleId"], str):
+                a["scheduleId"] = str(a["scheduleId"])
+
+        if "patientId" in a and not isinstance(a["patientId"], str):
+            a["patientId"] = str(a["patientId"])
+
+        if "doctorId" in a and not isinstance(a["doctorId"], str):
+            a["doctorId"] = str(a["doctorId"])
+
         doctor = find_user_by_id(a.get("doctorId"))
         if doctor:
             a["doctorName"] = doctor.get("name") or doctor.get("email")
@@ -135,11 +144,21 @@ def doctor_appointments():
 
     for a in appointments:
         a["_id"] = str(a["_id"])
-        if "scheduleId" in a:
-            a["scheduleId"] = str(a["scheduleId"])
+
+        if "scheduleId" in a and a["scheduleId"]:
+            if not isinstance(a["scheduleId"], str):
+                a["scheduleId"] = str(a["scheduleId"])
+
+        if "patientId" in a and not isinstance(a["patientId"], str):
+            a["patientId"] = str(a["patientId"])
+
+        if "doctorId" in a and not isinstance(a["doctorId"], str):
+            a["doctorId"] = str(a["doctorId"])
+
         patient = find_user_by_id(a.get("patientId"))
         if patient:
             a["patientName"] = patient.get("name") or patient.get("email")
+
         a["hasPrescription"] = (
             mongo.db.prescriptions.find_one({"appointmentId": a["_id"]}) is not None
         )
