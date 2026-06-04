@@ -28,3 +28,19 @@ class MedicineController:
         user_id = get_jwt_identity()
         history = MedicineService.get_history(user_id)
         return jsonify(history), 200
+
+    @staticmethod
+    def get_suggestions():
+        query = (request.args.get("q") or "").strip()
+        if len(query) < 2:
+            return jsonify([]), 200
+        suggestions = MedicineService.get_name_suggestions(query)
+        return jsonify(suggestions), 200
+
+    @staticmethod
+    def get_potencies():
+        name = (request.args.get("name") or "").strip()
+        if not name:
+            return jsonify({"error": "Query parameter 'name' is required."}), 400
+        result = MedicineService.get_medicine_potencies(name)
+        return jsonify(result), 200

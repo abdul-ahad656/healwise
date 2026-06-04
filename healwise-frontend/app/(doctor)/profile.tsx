@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, View, Text, ScrollView, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { History, LogOut } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
 import { DoctorScreenHeader } from '@/components/doctor/DoctorScreenHeader';
@@ -25,6 +25,7 @@ export default function DoctorProfileScreen() {
       <DoctorScreenHeader
         title="Profile"
         subtitle="Account and quick links"
+        onBack={() => router.navigate('/(doctor)/dashboard' as Href)}
       />
 
       <ScrollView
