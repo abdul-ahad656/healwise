@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
-  TextInput,
 } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Video, Calendar, Clock, User } from 'lucide-react-native';
@@ -18,6 +17,7 @@ import { Card } from '@/components/ui/card';
 import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import { PatientPrimaryButton } from '@/components/patient/PatientPrimaryButton';
 import ConsultationRoom from '@/components/VideoCall/ConsultationRoom';
+import { RescheduleSlotPicker } from '@/components/scheduling/RescheduleSlotPicker';
 import {
   getPatientAppointments,
   cancelAppointment,
@@ -26,7 +26,6 @@ import {
   Appointment,
 } from '@/services/doctorPanelService';
 import { isPastAppointment } from '@/utils/appointmentHistory';
-import { PLACEHOLDER_COLOR } from '@/styles/patientScreen';
 import AuthStore from '@/services/authStore';
 import { patientScreenStyles as s } from '@/styles/patientScreen';
 import {
@@ -351,25 +350,67 @@ export default function AppointmentsScreen() {
                   </View>
                 )}
 
+                {appointment.patientMarkedComplete &&
+                appointment.status !== 'completed' ? (
+                  <View style={local.markedBanner}>
+                    <Text style={local.markedBannerText}>
+                      {t('appointments_patient_marked_banner')}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {appointment.doctorMarkedComplete &&
+                !appointment.patientMarkedComplete &&
+                appointment.status !== 'completed' ? (
+                  <View style={[local.markedBanner, local.markedBannerDoctor]}>
+                    <Text style={local.markedBannerText}>
+                      {t('appointments_doctor_marked_banner')}
+                    </Text>
+                  </View>
+                ) : null}
+
                 {(appointment.status === 'accepted' ||
                   appointment.status === 'confirmed' ||
                   appointment.status === 'in_progress') && (
                   <View style={local.actionsCol}>
-                    <PatientPrimaryButton
-                      label="Mark consultation complete"
-                      variant="primary"
-                      onPress={async () => {
-                        try {
-                          await markAppointmentComplete(appointment._id);
-                          await loadAppointments();
-                        } catch (err: unknown) {
-                          Alert.alert(
-                            'Error',
-                            err instanceof Error ? err.message : 'Failed'
-                          );
-                        }
-                      }}
-                    />
+                    {!appointment.patientMarkedComplete &&
+                    appointment.status !== 'completed' ? (
+                      <PatientPrimaryButton
+                        label={t('appointments_mark_complete')}
+                        variant="primary"
+                        onPress={async () => {
+                          try {
+                            const updated = await markAppointmentComplete(
+                              appointment._id
+                            );
+                            setAppointments((prev) =>
+                              prev.map((a) =>
+                                a._id === appointment._id
+                                  ? { ...a, ...updated }
+                                  : a
+                              )
+                            );
+                            if (updated.status === 'completed') {
+                              Alert.alert(
+                                t('appointments_title'),
+                                t('appointments_mark_complete_done')
+                              );
+                              await loadAppointments();
+                            } else {
+                              Alert.alert(
+                                t('appointments_title'),
+                                t('appointments_mark_complete_success')
+                              );
+                            }
+                          } catch (err: unknown) {
+                            Alert.alert(
+                              'Error',
+                              err instanceof Error ? err.message : 'Failed'
+                            );
+                          }
+                        }}
+                      />
+                    ) : null}
                     <PatientPrimaryButton
                       label={
                         rescheduleId === appointment._id
@@ -380,10 +421,12 @@ export default function AppointmentsScreen() {
                       onPress={() => {
                         if (rescheduleId === appointment._id) {
                           setRescheduleId(null);
+                          setRescheduleDate('');
+                          setRescheduleTime('');
                         } else {
                           setRescheduleId(appointment._id);
-                          setRescheduleDate(appointment.appointmentDate);
-                          setRescheduleTime(appointment.appointmentTime);
+                          setRescheduleDate('');
+                          setRescheduleTime('');
                         }
                       }}
                     />
@@ -416,27 +459,20 @@ export default function AppointmentsScreen() {
 
                 {rescheduleId === appointment._id ? (
                   <View style={local.rescheduleBox}>
-                    <Text style={local.detailLabel}>New date (YYYY-MM-DD)</Text>
-                    <TextInput
-                      style={local.rescheduleInput}
-                      value={rescheduleDate}
-                      onChangeText={setRescheduleDate}
-                      placeholder="2026-05-25"
-                      placeholderTextColor={PLACEHOLDER_COLOR}
-                    />
-                    <Text style={[local.detailLabel, { marginTop: 8 }]}>
-                      New time slot
+                    <Text style={local.detailLabel}>
+                      {t('appointments_reschedule_pick')}
                     </Text>
-                    <TextInput
-                      style={local.rescheduleInput}
-                      value={rescheduleTime}
-                      onChangeText={setRescheduleTime}
-                      placeholder="10:30 - 13:00"
-                      placeholderTextColor={PLACEHOLDER_COLOR}
+                    <RescheduleSlotPicker
+                      doctorId={appointment.doctorId}
+                      selectedDay={rescheduleDate || null}
+                      selectedSlot={rescheduleTime || null}
+                      onDayChange={setRescheduleDate}
+                      onSlotChange={setRescheduleTime}
                     />
                     <PatientPrimaryButton
-                      label="Save reschedule"
+                      label={t('appointments_reschedule_save')}
                       variant="primary"
+                      disabled={!rescheduleDate.trim() || !rescheduleTime.trim()}
                       onPress={async () => {
                         try {
                           await rescheduleAppointment(
@@ -445,6 +481,12 @@ export default function AppointmentsScreen() {
                             rescheduleTime.trim()
                           );
                           setRescheduleId(null);
+                          setRescheduleDate('');
+                          setRescheduleTime('');
+                          Alert.alert(
+                            t('appointments_title'),
+                            'Appointment rescheduled successfully.'
+                          );
                           await loadAppointments();
                         } catch (err: unknown) {
                           Alert.alert(
@@ -613,6 +655,24 @@ const local = StyleSheet.create({
     lineHeight: 18,
   },
   actionsCol: { marginTop: 12, gap: 8 },
+  markedBanner: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#dbeafe',
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+  },
+  markedBannerDoctor: {
+    backgroundColor: '#dcfce7',
+    borderColor: '#86efac',
+  },
+  markedBannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1e40af',
+    lineHeight: 18,
+  },
   rescheduleBox: {
     marginTop: 10,
     padding: 12,
@@ -620,16 +680,5 @@ const local = StyleSheet.create({
     backgroundColor: '#f9fafb',
     borderWidth: 1,
     borderColor: '#e5e7eb',
-  },
-  rescheduleInput: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#111827',
-    backgroundColor: '#fff',
-    marginTop: 4,
   },
 });

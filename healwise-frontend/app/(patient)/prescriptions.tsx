@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Linking,
   RefreshControl,
 } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
@@ -16,10 +17,6 @@ import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import { PatientPrimaryButton } from '@/components/patient/PatientPrimaryButton';
 import { patientScreenStyles as s } from '@/styles/patientScreen';
 import { getPatientPrescriptions, Prescription } from '@/services/doctorPanelService';
-import {
-  downloadPrescriptionFile,
-  openPrescriptionInBrowser,
-} from '@/utils/downloadPrescription';
 
 export default function PrescriptionsScreen() {
   const router = useRouter();
@@ -27,8 +24,6 @@ export default function PrescriptionsScreen() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-
   useEffect(() => {
     loadPrescriptions();
   }, []);
@@ -51,28 +46,21 @@ export default function PrescriptionsScreen() {
     setRefreshing(false);
   };
 
-  const handleViewPrescription = async (prescription: Prescription) => {
+  const handleViewPrescription = async (url: string) => {
+    if (!url?.trim()) {
+      Alert.alert('Error', t('prescriptions_error_open'));
+      return;
+    }
     try {
-      await openPrescriptionInBrowser(prescription.cloudinaryUrl);
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        Alert.alert('Error', t('prescriptions_error_open'));
+        return;
+      }
+      await Linking.openURL(url);
     } catch (error) {
       Alert.alert('Error', t('prescriptions_error_open'));
       console.error(error);
-    }
-  };
-
-  const handleDownloadPrescription = async (prescription: Prescription) => {
-    setDownloadingId(prescription._id);
-    try {
-      await downloadPrescriptionFile(prescription.cloudinaryUrl, {
-        fileType: prescription.fileType,
-        baseName: `prescription_${prescription._id}`,
-      });
-      Alert.alert(t('prescriptions_title'), t('prescriptions_download_success'));
-    } catch (error) {
-      Alert.alert('Error', t('prescriptions_error_download'));
-      console.error(error);
-    } finally {
-      setDownloadingId(null);
     }
   };
 
@@ -175,23 +163,12 @@ export default function PrescriptionsScreen() {
                 </View>
               ) : null}
 
-              <View style={local.actionRow}>
-                <PatientPrimaryButton
-                  label={t('prescriptions_view')}
-                  variant="outline"
-                  fullWidth={false}
-                  onPress={() => handleViewPrescription(prescription)}
-                  style={local.actionBtnHalf}
-                />
-                <PatientPrimaryButton
-                  label={t('prescriptions_download')}
-                  variant="primary"
-                  fullWidth={false}
-                  onPress={() => handleDownloadPrescription(prescription)}
-                  style={local.actionBtnHalf}
-                  disabled={downloadingId === prescription._id}
-                />
-              </View>
+              <PatientPrimaryButton
+                label={t('prescriptions_view_download')}
+                variant="primary"
+                onPress={() => handleViewPrescription(prescription.cloudinaryUrl)}
+                style={local.actionBtn}
+              />
             </Card>
           ))
         )}
@@ -297,12 +274,7 @@ const local = StyleSheet.create({
     color: '#b45309',
     lineHeight: 18,
   },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 10,
+  actionBtn: {
     marginTop: 4,
-  },
-  actionBtnHalf: {
-    flex: 1,
   },
 });

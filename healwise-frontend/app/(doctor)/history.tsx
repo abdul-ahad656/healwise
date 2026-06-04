@@ -4,7 +4,6 @@ import {
   View,
   Text,
   ScrollView,
-  TextInput,
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -22,7 +21,7 @@ import {
   Appointment,
   SymptomHistoryItem,
 } from '@/services/doctorPanelService';
-import { adminScreenStyles as adminS, PLACEHOLDER_COLOR } from '@/styles/adminScreen';
+import { RescheduleSlotPicker } from '@/components/scheduling/RescheduleSlotPicker';
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -83,8 +82,21 @@ export default function HistoryScreen() {
 
   const handleMarkComplete = async (appointment: Appointment) => {
     try {
-      await markAppointmentComplete(appointment._id);
-      await refresh();
+      const updated = await markAppointmentComplete(appointment._id);
+      setAppointments((prev) =>
+        prev.map((row) =>
+          row._id === appointment._id ? { ...row, ...updated } : row
+        )
+      );
+      if (updated.status === 'completed') {
+        Alert.alert('Done', 'Consultation marked complete.');
+        await refresh();
+      } else if (updated.doctorMarkedComplete) {
+        Alert.alert(
+          'Recorded',
+          'You marked this complete. Waiting for patient confirmation or 30 min call time.'
+        );
+      }
     } catch (err: any) {
       Alert.alert('Cannot mark complete', err.message || 'Failed to update');
     }
@@ -211,15 +223,23 @@ export default function HistoryScreen() {
                   </>
                 ) : null}
 
+                {a.doctorMarkedComplete && a.status !== 'completed' ? (
+                  <Text style={[s.listCardMeta, { color: '#1d4ed8', marginTop: 8 }]}>
+                    You marked this complete. Waiting for patient or auto-complete.
+                  </Text>
+                ) : null}
+
                 {(a.status === 'accepted' ||
                   a.status === 'confirmed' ||
                   a.status === 'in_progress') && (
                   <>
-                    <DoctorPrimaryButton
-                      label="Mark consultation complete"
-                      variant="primary"
-                      onPress={() => handleMarkComplete(a)}
-                    />
+                    {!a.doctorMarkedComplete ? (
+                      <DoctorPrimaryButton
+                        label="Mark consultation complete"
+                        variant="primary"
+                        onPress={() => handleMarkComplete(a)}
+                      />
+                    ) : null}
                     <DoctorPrimaryButton
                       label={
                         rescheduleId === a._id ? 'Hide reschedule' : 'Reschedule'
@@ -228,10 +248,12 @@ export default function HistoryScreen() {
                       onPress={() => {
                         if (rescheduleId === a._id) {
                           setRescheduleId(null);
+                          setRescheduleDate('');
+                          setRescheduleTime('');
                         } else {
                           setRescheduleId(a._id);
-                          setRescheduleDate(a.appointmentDate);
-                          setRescheduleTime(a.appointmentTime);
+                          setRescheduleDate('');
+                          setRescheduleTime('');
                         }
                       }}
                     />
@@ -245,27 +267,21 @@ export default function HistoryScreen() {
 
                 {rescheduleId === a._id ? (
                   <View style={local.rescheduleBox}>
-                    <Text style={s.fieldLabel}>New date (YYYY-MM-DD)</Text>
-                    <TextInput
-                      style={adminS.input}
-                      value={rescheduleDate}
-                      onChangeText={setRescheduleDate}
-                      placeholder="2026-05-25"
-                      placeholderTextColor={PLACEHOLDER_COLOR}
-                    />
-                    <Text style={[s.fieldLabel, { marginTop: 8 }]}>
-                      New time (must match your schedule slot)
+                    <Text style={s.fieldLabel}>
+                      Choose a new date and time (only open slots)
                     </Text>
-                    <TextInput
-                      style={adminS.input}
-                      value={rescheduleTime}
-                      onChangeText={setRescheduleTime}
-                      placeholder="10:30 - 13:00"
-                      placeholderTextColor={PLACEHOLDER_COLOR}
+                    <RescheduleSlotPicker
+                      doctorId={a.doctorId}
+                      forDoctor
+                      selectedDay={rescheduleDate || null}
+                      selectedSlot={rescheduleTime || null}
+                      onDayChange={setRescheduleDate}
+                      onSlotChange={setRescheduleTime}
                     />
                     <DoctorPrimaryButton
                       label="Save reschedule"
                       variant="success"
+                      disabled={!rescheduleDate.trim() || !rescheduleTime.trim()}
                       onPress={() => submitReschedule(a._id)}
                       style={{ marginTop: 10 }}
                     />

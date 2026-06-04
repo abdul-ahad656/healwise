@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -20,12 +20,17 @@ type Lang = 'en' | 'ur';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const user = AuthStore.getUser();
 
   const initialLang: Lang = (user?.language === 'ur' ? 'ur' : 'en') as Lang;
   const [selected, setSelected] = useState<Lang>(initialLang);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const lng: Lang = i18n.language?.startsWith('ur') ? 'ur' : 'en';
+    setSelected(lng);
+  }, [i18n.language]);
 
   const handleLogout = () => {
     AuthStore.clear();
@@ -36,17 +41,20 @@ export default function ProfileScreen() {
     setSaving(true);
     try {
       await setLanguagePreference(selected);
-      Alert.alert('Saved', 'Language preference updated.');
+      Alert.alert(t('profile_saved_title'), t('profile_saved_message'));
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : 'Failed to update language';
-      Alert.alert('Error', message);
+        err instanceof Error ? err.message : t('profile_error_language');
+      Alert.alert(t('profile_error_title'), message);
     } finally {
       setSaving(false);
     }
   };
 
-  const name = useMemo(() => user?.name || 'User', [user]);
+  const name = useMemo(
+    () => user?.name || t('profile_user_fallback'),
+    [user, t]
+  );
   const email = useMemo(() => user?.email || '', [user]);
 
   return (
@@ -54,8 +62,8 @@ export default function ProfileScreen() {
       <View style={[StyleSheet.absoluteFill, s.pageBg]} />
 
       <PatientScreenHeader
-        title="Profile"
-        subtitle="Account & activity history"
+        title={t('profile_title')}
+        subtitle={t('profile_subtitle')}
         onBack={() => router.navigate('/(patient)/home' as Href)}
       />
 
@@ -68,7 +76,7 @@ export default function ProfileScreen() {
         {email ? <Text style={styles.email}>{email}</Text> : null}
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Language</Text>
+          <Text style={styles.cardTitle}>{t('profile_language_title')}</Text>
 
           <Pressable
             onPress={() => setSelected('en')}
@@ -82,7 +90,7 @@ export default function ProfileScreen() {
             >
               {selected === 'en' && <View style={styles.radioInner} />}
             </View>
-            <Text style={styles.radioText}>English</Text>
+            <Text style={styles.radioText}>{t('profile_language_english')}</Text>
           </Pressable>
 
           <Pressable
@@ -97,11 +105,11 @@ export default function ProfileScreen() {
             >
               {selected === 'ur' && <View style={styles.radioInner} />}
             </View>
-            <Text style={styles.radioText}>Urdu</Text>
+            <Text style={styles.radioText}>{t('profile_language_urdu')}</Text>
           </Pressable>
 
           <PatientPrimaryButton
-            label={saving ? 'Saving…' : 'Save language'}
+            label={saving ? t('profile_saving') : t('profile_save_language')}
             onPress={handleSaveLanguage}
             disabled={saving}
             variant="primary"
@@ -109,7 +117,7 @@ export default function ProfileScreen() {
           />
         </View>
 
-        <Text style={styles.sectionLabel}>Activity history</Text>
+        <Text style={styles.sectionLabel}>{t('profile_activity_section')}</Text>
 
         <Pressable
           onPress={() => router.push('/(patient)/symptom-history' as Href)}
@@ -123,10 +131,10 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.menuText}>
             <Text style={styles.menuTitle} numberOfLines={1}>
-              Symptom analysis history
+              {t('profile_symptom_history_title')}
             </Text>
             <Text style={styles.menuSubtitle} numberOfLines={2}>
-              View past symptom check results
+              {t('profile_symptom_history_subtitle')}
             </Text>
           </View>
           <View style={styles.chevronWrap}>
@@ -146,10 +154,10 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.menuText}>
             <Text style={styles.menuTitle} numberOfLines={1}>
-              Medicine comparison history
+              {t('profile_medicine_history_title')}
             </Text>
             <Text style={styles.menuSubtitle} numberOfLines={2}>
-              View past medicine comparisons
+              {t('profile_medicine_history_subtitle')}
             </Text>
           </View>
           <View style={styles.chevronWrap}>
@@ -181,7 +189,7 @@ export default function ProfileScreen() {
         </Pressable>
 
         <Pressable onPress={handleLogout} style={styles.logoutBtn}>
-          <Text style={styles.logoutText}>Logout</Text>
+          <Text style={styles.logoutText}>{t('profile_logout')}</Text>
         </Pressable>
       </ScrollView>
     </View>
