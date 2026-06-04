@@ -4,11 +4,14 @@ from app.extensions import mongo
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
 import re
+import pytz
 from app.models.user_model import find_user_by_id
 
 
+TZ = pytz.timezone('Asia/Karachi')
+
+
 def _parse_appointment_start(appointment_date, appointment_time):
-    """Parse slot start from '10:30' or '10:30 - 13:00'. Uses local wall-clock time."""
     date_match = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", str(appointment_date).strip())
     if not date_match:
         raise ValueError("Invalid appointment date")
@@ -24,7 +27,6 @@ def _parse_appointment_start(appointment_date, appointment_time):
 
 
 def _parse_appointment_end(appointment_date, appointment_time):
-    """Parse slot end from range string, or default to 60 minutes after start."""
     time_text = str(appointment_time).strip()
     range_match = re.match(r"^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})", time_text)
     start = _parse_appointment_start(appointment_date, appointment_time)
@@ -49,37 +51,47 @@ def book_appointment():
     doctor_id = data.get("doctorId")
     date = data.get("date")
     time = data.get("time")
-    symptom_id = data.get("symptomId")
-
-    # 🔴 1. CHECK DOCTOR SLOT EXISTS
-    slot_exists = mongo.db.doctor_availability.find_one({
-        "doctorId": doctor_id,
-        "day": date,
-        "slots": time
-    })
 
     doctor = mongo.db.users.find_one({"_id": ObjectId(doctor_id)})
     if not doctor or doctor.get("active") is False:
         return {"error": "Doctor is not available"}, 403
 
-    if not slot_exists:
-        return jsonify({
-            "error": "Selected slot not available for doctor"
-        }), 400
+    now = datetime.now(TZ).replace(tzinfo=None)
+    now_date = now.strftime('%Y-%m-%d')
+    now_time = now.strftime('%H:%M')
 
-    existing = mongo.db.appointments.find_one({
-        "doctorId": doctor_id,
-        "appointmentDate": date,
-        "appointmentTime": time,
-        "status": {"$in": ["pending", "accepted"]}
-    })
+    if date < now_date or (date == now_date and time < now_time):
+        return jsonify({"error": "Cannot book slot in the past"}), 400
 
-    if existing:
-        return jsonify({
-            "error": "Doctor is already booked at this time"
-        }), 409
+    slot_result = mongo.db.schedules.find_one_and_update(
+        {
+            "doctorId": doctor_id,
+            "date": date,
+            "startTime": time,
+            "status": "available"
+        },
+        {
+            "$set": {
+                "status": "booked",
+                "patientId": patient_id,
+                "bookedAt": datetime.utcnow()
+            }
+        }
+    )
+
+    if not slot_result:
+        existing = mongo.db.schedules.find_one({
+            "doctorId": doctor_id,
+            "date": date,
+            "startTime": time
+        })
+        if existing and existing.get("status") == "booked":
+            return jsonify({"error": "Slot already booked"}), 409
+        else:
+            return jsonify({"error": "Selected slot not available for doctor"}), 400
 
     appointment = {
+        "scheduleId": str(slot_result["_id"]),
         "patientId": patient_id,
         "doctorId": doctor_id,
         "symptomId": data.get("symptomId"),
@@ -100,8 +112,14 @@ def get_my_appointments():
         mongo.db.appointments.find({"patientId": user_id})
     )
 
+    now = datetime.now(TZ).replace(tzinfo=None)
+    now_date = now.strftime('%Y-%m-%d')
+    now_time = now.strftime('%H:%M')
+
     for a in appointments:
         a["_id"] = str(a["_id"])
+        if "scheduleId" in a:
+            a["scheduleId"] = str(a["scheduleId"])
         doctor = find_user_by_id(a.get("doctorId"))
         if doctor:
             a["doctorName"] = doctor.get("name") or doctor.get("email")
@@ -117,6 +135,8 @@ def doctor_appointments():
 
     for a in appointments:
         a["_id"] = str(a["_id"])
+        if "scheduleId" in a:
+            a["scheduleId"] = str(a["scheduleId"])
         patient = find_user_by_id(a.get("patientId"))
         if patient:
             a["patientName"] = patient.get("name") or patient.get("email")
@@ -143,7 +163,6 @@ def update_appointment_status(appointment_id):
 
 
 def start_consultation(appointment_id):
-    """Doctor starts a consultation for an appointment."""
     doctor_id = get_jwt_identity()
 
     try:

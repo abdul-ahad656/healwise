@@ -12,6 +12,7 @@ from .routes.medicine_routes import medicine_bp
 from .routes.doctor_routes import doctor_bp
 from .routes.appointment_routes import appointment_bp
 from .routes.availability_routes import availability_bp
+from .routes.schedule_routes import schedule_bp
 from .routes.public_routes import public_bp
 from .routes.admin_routes import admin_bp
 from .routes.doctor_profile_routes import doctor_profile_bp
@@ -106,6 +107,7 @@ def create_app():
         app.register_blueprint(doctor_bp, url_prefix="/api/doctor")
         app.register_blueprint(appointment_bp, url_prefix="/api/appointments")
         app.register_blueprint(availability_bp, url_prefix="/api/availability")
+        app.register_blueprint(schedule_bp, url_prefix="/api/schedules")
         app.register_blueprint(public_bp, url_prefix="/api/public")
         app.register_blueprint(admin_bp, url_prefix="/api/admin")
         app.register_blueprint(doctor_profile_bp, url_prefix="/api/doctor_profile")
