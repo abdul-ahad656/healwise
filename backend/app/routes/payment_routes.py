@@ -9,6 +9,7 @@ from app.controllers.payment_controller import (
     get_payment_history,
     refund_payment_handler,
     get_pending_easypaisa_for_admin,
+    get_admin_approved_payments_handler,
 )
 
 payment_bp = Blueprint("payment_bp", __name__)
@@ -53,6 +54,13 @@ def admin_reject():
 def admin_pending():
     """Admin endpoint to view pending Easypaisa payments."""
     return get_pending_easypaisa_for_admin()
+
+
+@payment_bp.get("/admin/approved-history")
+@jwt_required()
+def admin_approved_history():
+    """Admin endpoint: history of approved Easypaisa payments."""
+    return get_admin_approved_payments_handler()
 
 
 @payment_bp.get("/history")

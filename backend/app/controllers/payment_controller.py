@@ -593,6 +593,9 @@ def admin_reject_payment_handler():
 
 def _enrich_pending_payment(payment):
     """Add display fields for admin UI."""
+    from app.extensions import mongo
+    from bson.objectid import ObjectId
+
     meta = payment.get("metadata") or {}
     payment["doctor_name"] = meta.get("doctorName") or payment.get("doctor_name")
     payment["appointment_date"] = meta.get("appointmentDate") or payment.get("appointment_date")
@@ -602,6 +605,20 @@ def _enrich_pending_payment(payment):
         or payment.get("doctor_consultation_price")
         or payment.get("fee_pkr")
     )
+
+    user_id = payment.get("userId")
+    if user_id:
+        try:
+            user = mongo.db.users.find_one(
+                {"_id": ObjectId(str(user_id))},
+                {"name": 1, "email": 1},
+            )
+            if user:
+                payment["patient_name"] = user.get("name")
+                payment["patient_email"] = user.get("email")
+        except Exception:
+            pass
+
     return payment
 
 
@@ -867,3 +884,24 @@ def get_pending_easypaisa_for_admin():
 
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve pending payments: {str(e)}"}), 500
+
+
+def get_admin_approved_payments_handler():
+    """Admin endpoint: history of Easypaisa payments approved by admin."""
+    try:
+        from app.models.payment_model import get_admin_approved_payments
+
+        claims = get_jwt()
+        if claims.get("role") != "admin":
+            return jsonify({"error": "Only admins can view approved payments"}), 403
+
+        payments = get_admin_approved_payments()
+        payments = [_enrich_pending_payment(p) for p in payments]
+
+        return jsonify({
+            "total": len(payments),
+            "payments": payments,
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Failed to retrieve approved payments: {str(e)}"}), 500

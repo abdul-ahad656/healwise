@@ -30,6 +30,7 @@ export default function AdminLayout() {
       />
 
       <Tabs.Screen name="payments" options={{ href: null }} />
+      <Tabs.Screen name="payment-approved-history/index" options={{ href: null }} />
       <Tabs.Screen name="analytics" options={{ href: null }} />
       <Tabs.Screen name="manage-doctors" options={{ href: null }} />
       <Tabs.Screen name="manage-health-tips" options={{ href: null }} />

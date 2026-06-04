@@ -12,6 +12,7 @@ import {
   TextInput,
   RefreshControl,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { CheckCircle, AlertCircle, RefreshCw } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
 import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
@@ -75,6 +76,7 @@ function formatPkr(payment: PendingPayment): string {
 }
 
 export default function AdminPaymentsScreen() {
+  const router = useRouter();
   const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -262,6 +264,7 @@ export default function AdminPaymentsScreen() {
             ? 'Loading…'
             : `${pendingPayments.length} Easypaisa payment(s) awaiting review`
         }
+        onBack={() => router.back()}
         rightElement={refreshButton}
       />
 

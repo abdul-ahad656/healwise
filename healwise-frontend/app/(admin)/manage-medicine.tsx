@@ -41,18 +41,20 @@ function Field({
   );
 }
 
+const EMPTY_PAYLOAD: MedicineTypePayload = {
+  medicine_type: '',
+  description: '',
+  common_uses: '',
+  how_to_use: '',
+  precautions: '',
+  side_effects: '',
+  warnings: '',
+  otc: false,
+};
+
 export default function ManageMedicineScreen() {
   const router = useRouter();
-  const [payload, setPayload] = useState<MedicineTypePayload>({
-    medicine_type: '',
-    description: '',
-    common_uses: '',
-    how_to_use: '',
-    precautions: '',
-    side_effects: '',
-    warnings: '',
-    otc: false,
-  });
+  const [payload, setPayload] = useState<MedicineTypePayload>(EMPTY_PAYLOAD);
   const [saving, setSaving] = useState(false);
   const [items, setItems] = useState<MedicineTypeRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,14 +85,21 @@ export default function ManageMedicineScreen() {
       return;
     }
 
+    const isUpdate = editingType !== null;
+
     setSaving(true);
     try {
       await saveMedicineTypeAwareness(payload);
       Alert.alert(
         'Success',
-        editingType ? 'Medicine awareness updated' : 'Medicine awareness saved'
+        isUpdate ? 'Medicine awareness updated' : 'Medicine awareness saved'
       );
-      setEditingType(payload.medicine_type);
+      if (isUpdate) {
+        setEditingType(payload.medicine_type.trim());
+      } else {
+        setEditingType(null);
+        setPayload({ ...EMPTY_PAYLOAD });
+      }
       await loadItems();
     } catch (err: any) {
       Alert.alert(
@@ -119,6 +128,10 @@ export default function ManageMedicineScreen() {
   const handleDelete = async (medicineType: string) => {
     try {
       await deleteMedicineAwareness(medicineType);
+      if (editingType === medicineType) {
+        setEditingType(null);
+        setPayload({ ...EMPTY_PAYLOAD });
+      }
       await loadItems();
     } catch (err: any) {
       Alert.alert(

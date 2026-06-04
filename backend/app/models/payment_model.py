@@ -187,6 +187,21 @@ def update_payment_to_paid(payment_id, admin_notes=None):
         raise Exception(f"Failed to update payment to paid: {str(e)}")
 
 
+def _serialize_payment_doc(payment: dict) -> dict:
+    """Normalize ids and datetimes for JSON responses."""
+    payment["_id"] = str(payment["_id"])
+    for key in ("appointmentId", "appointmentRecordId", "appointmentTrackingId"):
+        if key in payment and payment[key] is not None:
+            payment[key] = str(payment[key])
+    if "userId" in payment and payment["userId"] is not None:
+        payment["userId"] = str(payment["userId"])
+
+    for field, value in list(payment.items()):
+        if isinstance(value, datetime):
+            payment[field] = value.isoformat()
+    return payment
+
+
 def get_pending_easypaisa_payments(limit=50):
     """Get all Easypaisa payments pending admin review."""
     try:
@@ -199,17 +214,27 @@ def get_pending_easypaisa_payments(limit=50):
             .limit(limit)
         )
 
-        for payment in payments:
-            payment["_id"] = str(payment["_id"])
-            for key in ("appointmentId", "appointmentRecordId", "appointmentTrackingId"):
-                if key in payment and payment[key] is not None:
-                    payment[key] = str(payment[key])
-            if "userId" in payment:
-                payment["userId"] = str(payment["userId"])
-
-        return payments
+        return [_serialize_payment_doc(p) for p in payments]
     except PyMongoError as e:
         raise Exception(f"Failed to retrieve pending payments: {str(e)}")
+
+
+def get_admin_approved_payments(limit=100):
+    """Easypaisa (and similar) payments confirmed by an admin."""
+    try:
+        payments = list(
+            mongo.db.payments.find(
+                {
+                    "status": "paid",
+                    "admin_approved_at": {"$exists": True},
+                }
+            )
+            .sort("admin_approved_at", -1)
+            .limit(limit)
+        )
+        return [_serialize_payment_doc(p) for p in payments]
+    except PyMongoError as e:
+        raise Exception(f"Failed to retrieve approved payments: {str(e)}")
 
 
 def update_payment_to_rejected(payment_id, admin_notes=None):
