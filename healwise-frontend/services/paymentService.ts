@@ -54,6 +54,33 @@ export interface SubmitProofResponse {
   status: string;
 }
 
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const text = await response.text();
+  if (!text || !text.trim()) {
+    throw new Error(
+      `Server returned an empty response (${response.status}). Check backend is running and reachable.`
+    );
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      `Invalid server response (${response.status}). ${text.slice(0, 120)}`
+    );
+  }
+}
+
+function proofImageMimeType(fileName?: string): string {
+  const ext = (fileName || '').toLowerCase().split('.').pop();
+  const map: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+  };
+  return map[ext || ''] || 'image/jpeg';
+}
+
 /**
  * Create payment for appointment booking.
  * Supports both Stripe (auto-confirm) and Easypaisa (manual approval) payment methods.
@@ -96,10 +123,10 @@ export const createPayment = async (
       body: JSON.stringify(requestBody),
     });
 
-    const data = await response.json();
+    const data = await parseJsonResponse<PaymentResponse & { error?: string }>(response);
 
     if (!response.ok) {
-      const errorMessage = data.error || data.message || JSON.stringify(data) || 'Failed to create payment';
+      const errorMessage = data.error || (data as { message?: string }).message || 'Failed to create payment';
       throw new Error(errorMessage);
     }
 
@@ -139,13 +166,68 @@ export const submitPaymentProof = async (
       }),
     });
 
-    const data = await response.json();
+    const data = await parseJsonResponse<SubmitProofResponse & { error?: string }>(response);
 
     if (!response.ok) {
       throw new Error(data.error || 'Failed to submit proof');
     }
 
     return data as SubmitProofResponse;
+  } catch (error: any) {
+    throw new Error(error.message || 'Network error');
+  }
+};
+
+/**
+ * Submit payment proof with image upload for Easypaisa payments.
+ * Uploads screenshot image to Cloudinary via backend.
+ */
+export const submitPaymentProofWithImage = async (
+  paymentId: string,
+  proofType: 'screenshot' | 'transaction_id',
+  proof: string,
+  imageUri?: string,
+  imageName?: string
+): Promise<SubmitProofResponse> => {
+  const token = AuthStore.getToken();
+
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  try {
+    if (proofType === 'screenshot' && imageUri) {
+      const fileName = imageName || 'payment_proof.jpg';
+      const formData = new FormData();
+      formData.append('payment_id', paymentId);
+      formData.append('proof_type', proofType);
+      formData.append('proof_image', {
+        uri: imageUri,
+        name: fileName,
+        type: proofImageMimeType(fileName),
+      } as any);
+
+      const response = await fetch(`${API_BASE_URL}/payments/submit-proof`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await parseJsonResponse<SubmitProofResponse & { error?: string }>(
+        response
+      );
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit proof');
+      }
+
+      return data as SubmitProofResponse;
+    } else {
+      // Submit transaction ID as JSON
+      return submitPaymentProof(paymentId, proofType, proof);
+    }
   } catch (error: any) {
     throw new Error(error.message || 'Network error');
   }

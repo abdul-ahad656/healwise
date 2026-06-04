@@ -8,16 +8,19 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, CreditCard, CheckCircle, Copy } from 'lucide-react-native';
+import { ArrowLeft, CreditCard, CheckCircle, Copy, Upload, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as DocumentPicker from 'expo-document-picker';
 import { Card } from '@/components/ui/card';
 import { PatientPrimaryButton } from '@/components/patient/PatientPrimaryButton';
 import {
   createPayment,
   submitPaymentProof,
+  submitPaymentProofWithImage,
   getPaymentAmountPkr,
   PaymentResponse,
   PaymentMethod,
@@ -70,6 +73,8 @@ export default function PaymentScreen() {
   const [easypaisaProof, setEasypaisaProof] = useState({
     type: 'screenshot' as 'screenshot' | 'transaction_id',
     value: '',
+    imageUri: '', // Add image URI for uploaded file
+    imageName: '', // Add image name
   });
 
   useEffect(() => {
@@ -94,7 +99,7 @@ export default function PaymentScreen() {
       setPaymentResponse(null);
       setError(null);
       setCardDetails({ number: '', expiry: '', cvc: '' });
-      setEasypaisaProof({ type: 'screenshot', value: '' });
+      setEasypaisaProof({ type: 'screenshot', value: '', imageUri: '', imageName: '' });
       return;
     }
 
@@ -161,9 +166,31 @@ export default function PaymentScreen() {
   };
 
   const handleEasypaisaSubmitProof = async () => {
-    if (!easypaisaProof.value) {
-      Alert.alert('Error', `Please provide ${easypaisaProof.type === 'screenshot' ? 'screenshot URL' : 'transaction ID'}`);
-      return;
+    // Validate based on proof type
+    if (easypaisaProof.type === 'transaction_id') {
+      // Validate transaction ID: must be numeric and exactly 11 digits
+      const txId = easypaisaProof.value.trim();
+      
+      if (!txId) {
+        Alert.alert('Error', 'Please enter your transaction ID');
+        return;
+      }
+      
+      if (!/^\d+$/.test(txId)) {
+        Alert.alert('Error', 'Transaction ID must contain only numbers');
+        return;
+      }
+      
+      if (txId.length !== 11) {
+        Alert.alert('Error', 'Transaction ID must be exactly 11 digits long');
+        return;
+      }
+    } else if (easypaisaProof.type === 'screenshot') {
+      // Validate screenshot image is selected
+      if (!easypaisaProof.imageUri) {
+        Alert.alert('Error', 'Please upload a screenshot');
+        return;
+      }
     }
 
     if (!paymentResponse || paymentResponse.payment_method !== 'easypaisa') {
@@ -175,10 +202,12 @@ export default function PaymentScreen() {
     setError(null);
 
     try {
-      await submitPaymentProof(
+      await submitPaymentProofWithImage(
         paymentResponse.paymentId,
         easypaisaProof.type,
-        easypaisaProof.value
+        easypaisaProof.value,
+        easypaisaProof.imageUri,
+        easypaisaProof.imageName
       );
 
       setProofSubmitted(true);
@@ -222,6 +251,36 @@ export default function PaymentScreen() {
   const copyToClipboard = (text: string) => {
     // For now just show alert - proper implementation would use expo-clipboard
     Alert.alert('Copied', text);
+  };
+
+  const pickImage = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'image/*',
+      });
+
+      if (result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setEasypaisaProof({
+          ...easypaisaProof,
+          imageUri: asset.uri,
+          imageName: asset.name || 'payment_proof.jpg',
+          value: asset.uri, // Store URI as value
+        });
+      }
+    } catch (err) {
+      console.error('Error picking image:', err);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const removeImage = () => {
+    setEasypaisaProof({
+      ...easypaisaProof,
+      imageUri: '',
+      imageName: '',
+      value: '',
+    });
   };
 
   if (!doctorId || !appointmentDate || !appointmentTime) {
@@ -569,7 +628,9 @@ export default function PaymentScreen() {
                     styles.proofTypeButton,
                     easypaisaProof.type === 'screenshot' && styles.proofTypeActive,
                   ]}
-                  onPress={() => setEasypaisaProof({ ...easypaisaProof, type: 'screenshot' })}
+                  onPress={() => {
+                    setEasypaisaProof({ type: 'screenshot', value: '', imageUri: '', imageName: '' });
+                  }}
                   disabled={processing}
                 >
                   <Text
@@ -587,7 +648,9 @@ export default function PaymentScreen() {
                     styles.proofTypeButton,
                     easypaisaProof.type === 'transaction_id' && styles.proofTypeActive,
                   ]}
-                  onPress={() => setEasypaisaProof({ ...easypaisaProof, type: 'transaction_id' })}
+                  onPress={() => {
+                    setEasypaisaProof({ type: 'transaction_id', value: '', imageUri: '', imageName: '' });
+                  }}
                   disabled={processing}
                 >
                   <Text
@@ -601,26 +664,72 @@ export default function PaymentScreen() {
                 </Pressable>
               </View>
 
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>
-                  {easypaisaProof.type === 'screenshot'
-                    ? 'Screenshot URL'
-                    : 'Transaction ID'}
-                </Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={
-                    easypaisaProof.type === 'screenshot'
-                      ? 'Paste screenshot URL here'
-                      : 'Enter transaction ID'
-                  }
-                  value={easypaisaProof.value}
-                  onChangeText={(text) =>
-                    setEasypaisaProof({ ...easypaisaProof, value: text })
-                  }
-                  editable={!processing}
-                />
-              </View>
+              {/* Screenshot Upload Section */}
+              {easypaisaProof.type === 'screenshot' && (
+                <View style={styles.screenshotSection}>
+                  {!easypaisaProof.imageUri ? (
+                    <Pressable
+                      style={styles.uploadButton}
+                      onPress={pickImage}
+                      disabled={processing}
+                    >
+                      <Upload size={24} color="#a855f7" />
+                      <Text style={styles.uploadButtonText}>Upload Screenshot</Text>
+                      <Text style={styles.uploadButtonSubtext}>Tap to select image</Text>
+                    </Pressable>
+                  ) : (
+                    <View style={styles.imagePreviewContainer}>
+                      <View style={styles.imagePreview}>
+                        <Image
+                          source={{ uri: easypaisaProof.imageUri }}
+                          style={styles.previewImage}
+                        />
+                      </View>
+                      <Text style={styles.imageNameText} numberOfLines={1}>
+                        {easypaisaProof.imageName}
+                      </Text>
+                      <Pressable
+                        style={styles.removeImageButton}
+                        onPress={removeImage}
+                        disabled={processing}
+                      >
+                        <X size={18} color="#dc2626" />
+                        <Text style={styles.removeImageText}>Remove</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Transaction ID Input Section */}
+              {easypaisaProof.type === 'transaction_id' && (
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>
+                    Transaction ID (11 digits)
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter 11-digit transaction ID"
+                    keyboardType="numeric"
+                    maxLength={11}
+                    value={easypaisaProof.value}
+                    onChangeText={(text) => {
+                      // Only allow digits
+                      const numericText = text.replace(/[^0-9]/g, '');
+                      setEasypaisaProof({ ...easypaisaProof, value: numericText });
+                    }}
+                    editable={!processing}
+                  />
+                  {easypaisaProof.value && (
+                    <Text style={[
+                      styles.digitCountText,
+                      easypaisaProof.value.length === 11 ? styles.digitCountValid : styles.digitCountInvalid
+                    ]}>
+                      {easypaisaProof.value.length} / 11 digits
+                    </Text>
+                  )}
+                </View>
+              )}
 
               {error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -842,6 +951,78 @@ const styles = StyleSheet.create({
   },
   proofTypeText: { fontSize: 12, fontWeight: '600', color: '#6b7280' },
   proofTypeTextActive: { color: '#a855f7' },
+  
+  // Screenshot Upload
+  screenshotSection: { gap: 12 },
+  uploadButton: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#a855f7',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#faf5ff',
+  },
+  uploadButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#a855f7',
+  },
+  uploadButtonSubtext: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  imagePreviewContainer: {
+    gap: 12,
+  },
+  imagePreview: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  previewImage: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  imageNameText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  removeImageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 8,
+    backgroundColor: '#fef2f2',
+  },
+  removeImageText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#dc2626',
+  },
+
+  // Transaction ID
+  digitCountText: {
+    fontSize: 12,
+    marginTop: 6,
+    fontWeight: '500',
+  },
+  digitCountValid: {
+    color: '#10b981',
+  },
+  digitCountInvalid: {
+    color: '#f59e0b',
+  },
+
   approvalText: { fontSize: 12, color: '#6b7280', textAlign: 'center', marginTop: 4 },
 
   // Error & Button

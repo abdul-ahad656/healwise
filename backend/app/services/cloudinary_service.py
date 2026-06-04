@@ -44,6 +44,31 @@ def upload_prescription_to_cloudinary(file_obj, appointment_id):
     except Exception as e:
         raise Exception(f"Failed to upload prescription to Cloudinary: {str(e)}")
 
+def upload_payment_proof_to_cloudinary(file_obj, payment_id):
+    """Upload Easypaisa payment screenshot proof."""
+    try:
+        init_cloudinary()
+
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        public_id = f"payment_proofs/{payment_id}_{timestamp}"
+
+        file_obj.seek(0)
+        response = cloudinary.uploader.upload(
+            file_obj,
+            public_id=public_id,
+            resource_type="image",
+            overwrite=False,
+            folder="healwise/payment_proofs",
+        )
+
+        return {
+            "url": response.get("secure_url") or response.get("url"),
+            "public_id": response.get("public_id"),
+        }
+    except Exception as e:
+        raise Exception(f"Failed to upload payment proof to Cloudinary: {str(e)}")
+
+
 def delete_prescription_from_cloudinary(public_id):
     try:
         init_cloudinary()

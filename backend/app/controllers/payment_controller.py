@@ -29,6 +29,47 @@ from app.services.payment_service import (
     get_doctor_consultation_price,
     validate_payment_method,
 )
+from app.services.cloudinary_service import upload_payment_proof_to_cloudinary
+import os
+
+
+def _parse_submit_proof_payload():
+    """
+    JSON body or multipart (proof_image file + form fields).
+    Returns (payment_id, proof_type, proof_text_or_url, upload_file).
+    """
+    if request.files and "proof_image" in request.files:
+        return (
+            (request.form.get("payment_id") or "").strip(),
+            (request.form.get("proof_type") or "screenshot").strip(),
+            None,
+            request.files["proof_image"],
+        )
+    data = request.get_json(silent=True) or {}
+    return (
+        (data.get("payment_id") or "").strip(),
+        (data.get("proof_type") or "").strip(),
+        (data.get("proof") or "").strip() if data.get("proof") is not None else "",
+        None,
+    )
+
+
+def _validate_payment_proof_file(file):
+    if not file or not file.filename:
+        return "No screenshot file provided"
+    ext = os.path.splitext(file.filename)[1].lower().lstrip(".")
+    allowed = current_app.config.get(
+        "ALLOWED_PAYMENT_PROOF_EXTENSIONS", {"jpg", "jpeg", "png", "webp"}
+    )
+    if ext not in allowed:
+        return f"Invalid file type. Allowed: {', '.join(sorted(allowed))}"
+    file.seek(0, os.SEEK_END)
+    size = file.tell()
+    file.seek(0)
+    max_size = current_app.config.get("MAX_PAYMENT_PROOF_FILE_SIZE", 5 * 1024 * 1024)
+    if size > max_size:
+        return f"File too large. Maximum size: {max_size // (1024 * 1024)}MB"
+    return None
 
 
 def create_payment_handler():
@@ -315,14 +356,8 @@ def submit_proof_handler():
     """
     Submit payment proof for Easypaisa payments.
 
-    Expected JSON body:
-    {
-        "payment_id": "...",
-        "proof_type": "screenshot" | "transaction_id",
-        "proof": "image_url_or_transaction_id"
-    }
-
-    Returns: { message, status }
+    JSON: { payment_id, proof_type, proof }
+    Multipart: payment_id, proof_type, proof_image (file)
     """
     try:
         user_id = get_jwt_identity()
@@ -331,48 +366,60 @@ def submit_proof_handler():
         if claims.get("role") != "patient":
             return jsonify({"error": "Only patients can submit proofs"}), 403
 
-        data = request.json or {}
-        payment_id = data.get("payment_id")
-        proof_type = data.get("proof_type")
-        proof = data.get("proof")
+        payment_id, proof_type, proof, upload_file = _parse_submit_proof_payload()
 
-        # Validate required fields
-        if not all([payment_id, proof_type, proof]):
-            return jsonify({
-                "error": "Missing required fields: payment_id, proof_type, proof"
-            }), 400
+        if not payment_id:
+            return jsonify({"error": "Missing required field: payment_id"}), 400
 
-        # Validate proof_type
         if proof_type not in ["screenshot", "transaction_id"]:
             return jsonify({
                 "error": "Invalid proof_type. Must be 'screenshot' or 'transaction_id'"
             }), 400
 
-        # Fetch payment
+        if proof_type == "screenshot":
+            if upload_file:
+                file_error = _validate_payment_proof_file(upload_file)
+                if file_error:
+                    return jsonify({"error": file_error}), 400
+            elif not proof:
+                return jsonify({
+                    "error": "Missing screenshot. Upload an image or use multipart proof_image."
+                }), 400
+        elif not proof:
+            return jsonify({
+                "error": "Missing required field: proof (transaction ID)"
+            }), 400
+
         try:
             payment_id_obj = ObjectId(payment_id)
             payment = find_payment_by_id(payment_id_obj)
-        except:
+        except Exception:
             return jsonify({"error": "Invalid payment ID"}), 400
 
         if not payment:
             return jsonify({"error": "Payment not found"}), 404
 
-        # Validate payment ownership
-        if payment["userId"] != user_id:
+        if str(payment.get("userId")) != str(user_id):
             return jsonify({"error": "You can only submit proof for your own payments"}), 403
 
-        # Validate payment method
         if payment.get("payment_method") != "easypaisa":
             return jsonify({"error": "Proof can only be submitted for Easypaisa payments"}), 400
 
-        # Validate payment status
         if payment.get("status") != "pending":
             return jsonify({
                 "error": f"Cannot submit proof for payment with status: {payment.get('status')}"
             }), 400
 
-        # Store proof and update status
+        if proof_type == "screenshot" and upload_file:
+            try:
+                uploaded = upload_payment_proof_to_cloudinary(upload_file, payment_id)
+                proof = uploaded["url"]
+            except Exception as e:
+                current_app.logger.error(f"Payment proof upload failed: {e}")
+                return jsonify({
+                    "error": "Failed to upload screenshot. Please try again or contact support."
+                }), 500
+
         try:
             proof_data = {"proof_type": proof_type, "proof": proof}
             submit_payment_proof(payment_id_obj, proof_data)
@@ -386,6 +433,7 @@ def submit_proof_handler():
         }), 200
 
     except Exception as e:
+        current_app.logger.exception("submit_proof_handler failed")
         return jsonify({"error": f"Internal error: {str(e)}"}), 500
 
 

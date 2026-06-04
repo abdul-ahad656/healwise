@@ -44,6 +44,9 @@ class Config:
     MAX_PRESCRIPTION_FILE_SIZE = 10 * 1024 * 1024
     ALLOWED_PRESCRIPTION_EXTENSIONS = {"pdf", "jpg", "jpeg", "png"}
 
+    MAX_PAYMENT_PROOF_FILE_SIZE = 5 * 1024 * 1024
+    ALLOWED_PAYMENT_PROOF_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+
     # Stripe Payment
     STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
     STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
