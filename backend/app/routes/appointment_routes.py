@@ -1,4 +1,6 @@
-from flask import Blueprint
+# app/routes/appointment_routes.py
+
+from flask import Blueprint, jsonify
 from flask_jwt_extended import jwt_required
 from app.controllers.appointment_controller import (
     book_appointment,
@@ -28,7 +30,7 @@ def my_appointments():
 @jwt_required()
 def doctor_view():
     if not doctor_required():
-        return {"error": "Doctor only"}, 403
+        return jsonify({"error": "Doctor only"}), 403
     return doctor_appointments()
 
 # Doctor updates appointment status
@@ -36,7 +38,7 @@ def doctor_view():
 @jwt_required()
 def update(appointment_id):
     if not doctor_required():
-        return {"error": "Doctor only"}, 403
+        return jsonify({"error": "Doctor only"}), 403
     return update_appointment_status(appointment_id)
 
 
@@ -45,5 +47,5 @@ def update(appointment_id):
 @jwt_required()
 def start_consult(appointment_id):
     if not doctor_required():
-        return {"error": "Doctor only"}, 403
+        return jsonify({"error": "Doctor only"}), 403
     return start_consultation(appointment_id)

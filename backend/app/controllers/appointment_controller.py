@@ -10,6 +10,57 @@ from app.models.user_model import find_user_by_id
 
 TZ = pytz.timezone('Asia/Karachi')
 
+_DATETIME_KEYS = (
+    "createdAt",
+    "updatedAt",
+    "consultationStartedAt",
+    "bookedAt",
+)
+
+_ID_KEYS = ("scheduleId", "patientId", "doctorId", "symptomId", "paymentId")
+
+
+def _serialize_appointment_for_response(doc):
+    """Make a Mongo appointment document JSON-safe for Flask jsonify."""
+    if not doc:
+        return doc
+    out = dict(doc)
+    out["_id"] = str(out["_id"])
+    for key in _ID_KEYS:
+        if key in out and out[key] is not None and not isinstance(out[key], str):
+            out[key] = str(out[key])
+    for key in _DATETIME_KEYS:
+        val = out.get(key)
+        if val is not None and hasattr(val, "isoformat"):
+            out[key] = val.isoformat()
+    return out
+
+
+def _doctor_appointments_query(doctor_id):
+    """Match doctorId stored as string or ObjectId."""
+    try:
+        oid = ObjectId(doctor_id)
+        return {"$or": [{"doctorId": doctor_id}, {"doctorId": oid}]}
+    except Exception:
+        return {"doctorId": doctor_id}
+
+
+def _patient_appointments_query(patient_id):
+    try:
+        oid = ObjectId(patient_id)
+        return {"$or": [{"patientId": patient_id}, {"patientId": oid}]}
+    except Exception:
+        return {"patientId": patient_id}
+
+
+def _prescription_exists_for_appointment(appointment_id_str):
+    try:
+        oid = ObjectId(appointment_id_str)
+        filt = {"$or": [{"appointmentId": appointment_id_str}, {"appointmentId": oid}]}
+    except Exception:
+        filt = {"appointmentId": appointment_id_str}
+    return mongo.db.prescriptions.find_one(filt) is not None
+
 
 def _parse_appointment_start(appointment_date, appointment_time):
     date_match = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", str(appointment_date).strip())
@@ -109,61 +160,36 @@ def book_appointment():
 def get_my_appointments():
     user_id = get_jwt_identity()
     appointments = list(
-        mongo.db.appointments.find({"patientId": user_id})
+        mongo.db.appointments.find(_patient_appointments_query(user_id))
     )
 
-    now = datetime.now(TZ).replace(tzinfo=None)
-    now_date = now.strftime('%Y-%m-%d')
-    now_time = now.strftime('%H:%M')
-
+    payload = []
     for a in appointments:
-        a["_id"] = str(a["_id"])
-
-        if "scheduleId" in a and a["scheduleId"]:
-            if not isinstance(a["scheduleId"], str):
-                a["scheduleId"] = str(a["scheduleId"])
-
-        if "patientId" in a and not isinstance(a["patientId"], str):
-            a["patientId"] = str(a["patientId"])
-
-        if "doctorId" in a and not isinstance(a["doctorId"], str):
-            a["doctorId"] = str(a["doctorId"])
-
-        doctor = find_user_by_id(a.get("doctorId"))
+        row = _serialize_appointment_for_response(a)
+        doctor = find_user_by_id(row.get("doctorId"))
         if doctor:
-            a["doctorName"] = doctor.get("name") or doctor.get("email")
+            row["doctorName"] = doctor.get("name") or doctor.get("email")
+        payload.append(row)
 
-    return jsonify(appointments), 200
+    return jsonify(payload), 200
 
 
 def doctor_appointments():
     doctor_id = get_jwt_identity()
     appointments = list(
-        mongo.db.appointments.find({"doctorId": doctor_id})
+        mongo.db.appointments.find(_doctor_appointments_query(doctor_id))
     )
 
+    payload = []
     for a in appointments:
-        a["_id"] = str(a["_id"])
-
-        if "scheduleId" in a and a["scheduleId"]:
-            if not isinstance(a["scheduleId"], str):
-                a["scheduleId"] = str(a["scheduleId"])
-
-        if "patientId" in a and not isinstance(a["patientId"], str):
-            a["patientId"] = str(a["patientId"])
-
-        if "doctorId" in a and not isinstance(a["doctorId"], str):
-            a["doctorId"] = str(a["doctorId"])
-
-        patient = find_user_by_id(a.get("patientId"))
+        row = _serialize_appointment_for_response(a)
+        patient = find_user_by_id(row.get("patientId"))
         if patient:
-            a["patientName"] = patient.get("name") or patient.get("email")
+            row["patientName"] = patient.get("name") or patient.get("email")
+        row["hasPrescription"] = _prescription_exists_for_appointment(row["_id"])
+        payload.append(row)
 
-        a["hasPrescription"] = (
-            mongo.db.prescriptions.find_one({"appointmentId": a["_id"]}) is not None
-        )
-
-    return jsonify(appointments), 200
+    return jsonify(payload), 200
 
 
 def update_appointment_status(appointment_id):
