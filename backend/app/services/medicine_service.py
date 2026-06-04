@@ -80,3 +80,11 @@ class MedicineService:
             if item.get("createdAt"):
                 item["createdAt"] = item["createdAt"].isoformat()
         return history
+
+    @staticmethod
+    def get_name_suggestions(query: str):
+        return MedicineModel.search_name_suggestions(query, limit=10)
+
+    @staticmethod
+    def get_medicine_potencies(name: str):
+        return MedicineModel.get_potencies_for_name(name)
