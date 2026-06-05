@@ -76,6 +76,21 @@ class LanguageSchema(BaseAuthSchema):
         return data
 
 
+class ProfileUpdateSchema(BaseAuthSchema):
+    name = fields.String(required=True, validate=validate.Length(min=1, max=120))
+
+
+class ProfilePasswordSchema(BaseAuthSchema):
+    password = fields.String(required=True, validate=validate.Length(min=8, max=256))
+    verification_token = fields.String(required=True, validate=validate.Length(min=10, max=4096))
+
+    @validates_schema
+    def validate_password_strength(self, data, **kwargs):
+        is_valid, message = validate_password_strength(data.get("password"))
+        if not is_valid:
+            raise ValidationError(message, "password")
+
+
 def format_validation_errors(err: ValidationError) -> dict:
     """Flat, client-friendly validation errors."""
     if isinstance(err.messages, dict):

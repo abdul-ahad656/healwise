@@ -1,7 +1,7 @@
 import { API_BASE_URL } from './config';
 import { fetchJson } from './httpClient';
 
-export type OtpPurpose = 'register' | 'reset_password';
+export type OtpPurpose = 'register' | 'reset_password' | 'change_password';
 
 export interface SendOtpResponse {
   message: string;

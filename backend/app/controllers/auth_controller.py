@@ -3,15 +3,18 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson.objectid import ObjectId
 
 from app.extensions import mongo
-from app.services.auth_service import register_user, login_user, reset_password
+from app.services.auth_service import register_user, login_user, reset_password, update_profile_name, update_profile_password
 from app.utils.request_validation import validate_json
 from app.security.schemas import (
     LoginSchema,
     RegisterSchema,
     ResetPasswordSchema,
     LanguageSchema,
+    ProfileUpdateSchema,
+    ProfilePasswordSchema,
     normalize_email_in_data,
 )
+from app.services.otp_service import send_otp
 
 
 @validate_json(RegisterSchema())
@@ -62,3 +65,34 @@ def set_language(data):
     )
 
     return jsonify({"message": "Language updated", "language": language}), 200
+
+
+@jwt_required()
+@validate_json(ProfileUpdateSchema())
+def update_profile(data):
+    user_id = get_jwt_identity()
+    result, status = update_profile_name(user_id, data.get("name"))
+    return jsonify(result), status
+
+
+@jwt_required()
+@validate_json(ProfilePasswordSchema())
+def update_profile_password_handler(data):
+    user_id = get_jwt_identity()
+    result, status = update_profile_password(
+        user_id,
+        data.get("password"),
+        data.get("verification_token"),
+    )
+    return jsonify(result), status
+
+
+@jwt_required()
+def send_profile_password_otp():
+    user_id = get_jwt_identity()
+    user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    result, status = send_otp(user.get("email"), purpose="change_password")
+    return jsonify(result), status

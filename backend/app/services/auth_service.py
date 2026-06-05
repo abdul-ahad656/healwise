@@ -147,3 +147,58 @@ def reset_password(email, password, verification_token):
     )
 
     return {"message": "Password reset successfully"}, 200
+
+
+def update_profile_name(user_id, name):
+    """Update authenticated user's display name."""
+    name = (name or "").strip()
+    if not name:
+        return {"error": "Name is required"}, 400
+    if len(name) > 120:
+        return {"error": "Name is too long"}, 400
+
+    user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return {"error": "User not found"}, 404
+
+    mongo.db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"name": name}})
+
+    return {
+        "message": "Profile updated",
+        "user": {
+            "id": str(user_id),
+            "name": name,
+            "email": user.get("email"),
+            "role": user.get("role", "patient"),
+            "language": user.get("language", "en"),
+        },
+    }, 200
+
+
+def update_profile_password(user_id, password, verification_token):
+    """Change password after OTP verification on the user's own email."""
+    user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return {"error": "User not found"}, 404
+
+    email = (user.get("email") or "").strip().lower()
+    token_ok, token_error = validate_verification_token(verification_token, email)
+    if not token_ok:
+        return {"error": token_error}, 401
+
+    is_valid, error_message = validate_password_strength(password)
+    if not is_valid:
+        return {"error": error_message}, 400
+
+    mongo.db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {
+            "$set": {
+                "password": generate_password_hash(password),
+                "failed_attempts": 0,
+                "locked_until": None,
+            }
+        },
+    )
+
+    return {"message": "Password updated successfully"}, 200

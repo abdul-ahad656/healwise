@@ -112,6 +112,82 @@ export const setLanguagePreference = async (language: 'en' | 'ur'): Promise<void
   applyPatientLocale(language);
 };
 
+export const updateProfileName = async (name: string): Promise<User> => {
+  const token = AuthStore.getToken();
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const { response, data } = await fetchJson<{ user: User; error?: string }>(
+    `${API_BASE_URL}/auth/profile`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name: name.trim() }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to update profile');
+  }
+
+  AuthStore.setUser(data.user);
+  return data.user;
+};
+
+export const sendProfilePasswordOtp = async (): Promise<void> => {
+  const token = AuthStore.getToken();
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const { response, data } = await fetchJson<{ error?: string; message?: string }>(
+    `${API_BASE_URL}/auth/profile/send-password-otp`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to send OTP');
+  }
+};
+
+export const updateProfilePassword = async (
+  password: string,
+  verificationToken: string
+): Promise<void> => {
+  const token = AuthStore.getToken();
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const { response, data } = await fetchJson<{ error?: string; message?: string }>(
+    `${API_BASE_URL}/auth/profile/password`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        password,
+        verification_token: verificationToken,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to update password');
+  }
+};
+
 export const resetPassword = async (
   email: string,
   password: string,

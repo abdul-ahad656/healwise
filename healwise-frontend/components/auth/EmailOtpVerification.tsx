@@ -19,6 +19,7 @@ type Props = {
   onVerified: (verificationToken: string) => void;
   onEmailChange?: (email: string) => void;
   emailEditable?: boolean;
+  customSendOtp?: () => Promise<void>;
 };
 
 export function EmailOtpVerification({
@@ -27,6 +28,7 @@ export function EmailOtpVerification({
   onVerified,
   onEmailChange,
   emailEditable = true,
+  customSendOtp,
 }: Props) {
   const { t } = useTranslation();
   const [otp, setOtp] = useState('');
@@ -38,6 +40,7 @@ export function EmailOtpVerification({
 
   const emailValidation = validateEmail(email);
   const normalizedEmail = email.trim().toLowerCase();
+  const canSendOtp = customSendOtp ? !!normalizedEmail : emailValidation.isValid;
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -48,14 +51,18 @@ export function EmailOtpVerification({
   }, [cooldown]);
 
   const handleSendOtp = async () => {
-    if (!emailValidation.isValid) {
+    if (!canSendOtp) {
       Alert.alert(t('otp_error_title'), t(emailValidation.error || 'email_error_invalid'));
       return;
     }
 
     setSending(true);
     try {
-      await sendOtp(normalizedEmail, purpose);
+      if (customSendOtp) {
+        await customSendOtp();
+      } else {
+        await sendOtp(normalizedEmail, purpose);
+      }
       setOtpSent(true);
       setCooldown(60);
       Alert.alert(t('otp_sent_title'), t('otp_sent_message'));
@@ -122,10 +129,10 @@ export function EmailOtpVerification({
 
       <Pressable
         onPress={handleSendOtp}
-        disabled={sending || cooldown > 0 || !emailValidation.isValid}
+        disabled={sending || cooldown > 0 || !canSendOtp}
         style={[
           styles.secondaryBtn,
-          (sending || cooldown > 0 || !emailValidation.isValid) && styles.btnDisabled,
+          (sending || cooldown > 0 || !canSendOtp) && styles.btnDisabled,
         ]}
       >
         {sending ? (

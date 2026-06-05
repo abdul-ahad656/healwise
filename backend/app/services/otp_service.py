@@ -67,7 +67,7 @@ def send_otp_email(email, otp):
 def send_otp(email, purpose="register"):
     """
     Generate and send OTP to email.
-    purpose: 'register' | 'reset_password'
+    purpose: 'register' | 'reset_password' | 'change_password'
     Rate limit: max 1 OTP per 60 seconds per email.
     """
     email = (email or "").strip().lower()
@@ -87,6 +87,9 @@ def send_otp(email, purpose="register"):
             return {
                 "message": "If an account exists for this email, an OTP has been sent.",
             }, 200
+    elif purpose == "change_password":
+        if not find_user_by_email(email):
+            return {"error": "No account found for this email"}, 400
     else:
         return {"error": "Invalid OTP purpose"}, 400
 
