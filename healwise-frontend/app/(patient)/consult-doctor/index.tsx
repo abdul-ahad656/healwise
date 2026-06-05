@@ -147,13 +147,6 @@ export default function DoctorConsultation() {
             <Text style={styles.callBtnText}>{t("doctor_emergency_call")}</Text>
           </Pressable>
         </Card>
-
-        <View style={styles.disclaimer}>
-          <Info size={14} color="#854d0e" />
-          <Text style={styles.disclaimerText}>
-            {t("doctor_disclaimer")}
-          </Text>
-        </View>
       </ScrollView>
     </View>
   );
