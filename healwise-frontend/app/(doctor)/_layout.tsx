@@ -34,6 +34,7 @@ export default function DoctorLayout() {
       <Tabs.Screen name="teleconsult" options={{ href: null }} />
       <Tabs.Screen name="upload-prescription" options={{ href: null }} />
       <Tabs.Screen name="history" options={{ href: null }} />
+      <Tabs.Screen name="update-password" options={{ href: null }} />
     </Tabs>
   );
 }

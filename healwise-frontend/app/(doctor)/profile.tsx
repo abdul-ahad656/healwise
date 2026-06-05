@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { History, LogOut } from 'lucide-react-native';
+import { History, KeyRound, LogOut } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
 import { DoctorScreenHeader } from '@/components/doctor/DoctorScreenHeader';
 import { doctorScreenStyles as s } from '@/styles/doctorScreen';
@@ -51,6 +51,23 @@ export default function DoctorProfileScreen() {
               </Text>
             </View>
           </Pressable>
+
+          <View style={styles.divider} />
+
+          <Pressable
+            onPress={() => router.push('/(doctor)/update-password' as Href)}
+            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.85 : 1 }]}
+          >
+            <View style={styles.iconCircle}>
+              <KeyRound size={20} color="#1d4ed8" />
+            </View>
+            <View style={styles.rowText}>
+              <Text style={styles.rowTitle}>Update password</Text>
+              <Text style={styles.rowSubtitle}>
+                Change your account password with email verification
+              </Text>
+            </View>
+          </Pressable>
         </Card>
 
         <Pressable onPress={handleLogout} style={styles.logoutBtn}>
@@ -96,7 +113,12 @@ const styles = StyleSheet.create({
   },
   rowText: {
     flex: 1,
-   },
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginHorizontal: 14,
+  },
   rowTitle: {
     fontSize: 15,
     fontWeight: '700',

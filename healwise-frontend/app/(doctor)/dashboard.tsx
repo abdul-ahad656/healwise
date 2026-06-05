@@ -36,7 +36,7 @@ export default function DoctorDashboard() {
     fetchAppointments();
   }, []);
 
-  const pending = appointments.filter((a) => a.status === 'pending');
+  const completed = appointments.filter((a) => a.status === 'completed');
   const upcoming = appointments.filter((a) =>
     ['pending', 'accepted', 'confirmed', 'in_progress'].includes(a.status)
   );
@@ -89,9 +89,9 @@ export default function DoctorDashboard() {
         showsVerticalScrollIndicator={false}
       >
         <View style={dash.statsRow}>
-          <Card style={[dash.statCard, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}>
-            <Text style={dash.statValue}>{pending.length}</Text>
-            <Text style={dash.statLabel}>Pending</Text>
+          <Card style={[dash.statCard, { backgroundColor: '#f5f3ff', borderColor: '#ddd6fe' }]}>
+            <Text style={dash.statValue}>{completed.length}</Text>
+            <Text style={dash.statLabel}>Completed</Text>
           </Card>
           <Card style={[dash.statCard, { backgroundColor: '#ecfdf5', borderColor: '#bbf7d0' }]}>
             <Text style={dash.statValue}>{upcoming.length}</Text>
