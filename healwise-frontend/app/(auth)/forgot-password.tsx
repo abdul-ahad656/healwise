@@ -19,6 +19,7 @@ import { EmailOtpVerification } from '@/components/auth/EmailOtpVerification';
 import { resetPassword } from '@/services/authService';
 import { useTranslation } from 'react-i18next';
 import { validateEmail } from '@/utils/emailValidator';
+import { EmailValidationHint } from '@/components/auth/EmailValidationHint';
 import { validatePassword, validatePasswordMatch } from '@/utils/passwordValidator';
 
 export default function ForgotPasswordScreen() {
@@ -125,8 +126,15 @@ export default function ForgotPasswordScreen() {
                 editable={!verificationToken}
               />
             </View>
-            {email.length > 0 && !emailValidation.isValid && emailValidation.error ? (
-              <Text style={styles.fieldError}>{t(emailValidation.error)}</Text>
+            {email.length > 0 ? (
+              <EmailValidationHint
+                email={email}
+                validation={emailValidation}
+                onApplySuggestion={(value) => {
+                  setEmail(value);
+                  setVerificationToken(null);
+                }}
+              />
             ) : null}
           </View>
 

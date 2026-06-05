@@ -20,6 +20,7 @@ import { register } from "@/services/authService";
 import { useTranslation } from "react-i18next";
 import { validatePassword, validatePasswordMatch } from "@/utils/passwordValidator";
 import { validateEmail } from "@/utils/emailValidator";
+import { EmailValidationHint } from "@/components/auth/EmailValidationHint";
 import { EmailOtpVerification } from "@/components/auth/EmailOtpVerification";
 
 export default function RegisterScreen() {
@@ -150,8 +151,15 @@ export default function RegisterScreen() {
                 style={styles.textInput}
               />
             </View>
-            {form.email.length > 0 && !emailValidation.isValid && emailValidation.error ? (
-              <Text style={styles.fieldError}>{t(emailValidation.error)}</Text>
+            {form.email.length > 0 ? (
+              <EmailValidationHint
+                email={form.email}
+                validation={emailValidation}
+                onApplySuggestion={(value) => {
+                  setForm({ ...form, email: value });
+                  setVerificationToken(null);
+                }}
+              />
             ) : null}
           </View>
 

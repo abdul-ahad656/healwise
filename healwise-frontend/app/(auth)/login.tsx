@@ -20,6 +20,7 @@ import { Card } from "@/components/ui/card";
 import { login } from "@/services/authService";
 import { useTranslation } from "react-i18next";
 import { validateEmail } from "@/utils/emailValidator";
+import { EmailValidationHint } from "@/components/auth/EmailValidationHint";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -120,8 +121,12 @@ export default function LoginScreen() {
                       style={styles.textInput}
                     />
                   </View>
-                  {email.length > 0 && !emailValidation.isValid && emailValidation.error ? (
-                    <Text style={styles.fieldError}>{t(emailValidation.error)}</Text>
+                  {email.length > 0 ? (
+                    <EmailValidationHint
+                      email={email}
+                      validation={emailValidation}
+                      onApplySuggestion={setEmail}
+                    />
                   ) : null}
                 </View>
 

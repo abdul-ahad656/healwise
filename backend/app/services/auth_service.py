@@ -3,7 +3,6 @@ from flask_jwt_extended import create_access_token
 from bson.objectid import ObjectId
 
 from app.models.user_model import create_user, find_user_by_email
-from app.utils.password_validator import validate_password_strength
 from app.utils.email_validator import validate_email
 from app.utils.jwt_verification import validate_verification_token
 from app.extensions import mongo
@@ -77,6 +76,11 @@ def login_user(email, password):
     """
     email = (email or "").strip().lower()
     client_ip = get_real_client_ip()
+
+    is_email_valid, email_error = validate_email(email)
+    if not is_email_valid:
+        return {"error": email_error}, 400
+
     user = find_user_by_email(email)
 
     if not user:

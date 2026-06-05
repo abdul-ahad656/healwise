@@ -28,6 +28,7 @@ import {
   adminPrimaryButtonTextStyle,
 } from '@/components/admin/AdminActionButton';
 import { validateEmail } from '@/utils/emailValidator';
+import { EmailValidationHint } from '@/components/auth/EmailValidationHint';
 import { validatePassword } from '@/utils/passwordValidator';
 import { useTranslation } from 'react-i18next';
 
@@ -116,7 +117,11 @@ export default function ManageDoctorsScreen() {
     if (!emailValidation.isValid) {
       Alert.alert(
         'Validation',
-        emailValidation.error ? t(emailValidation.error) : 'Invalid email'
+        emailValidation.suggestion
+          ? t('email_error_domain_typo', { suggestion: emailValidation.suggestion })
+          : emailValidation.error
+            ? t(emailValidation.error)
+            : 'Invalid email'
       );
       return;
     }
@@ -249,14 +254,7 @@ export default function ManageDoctorsScreen() {
               onChangeText={(text) => setForm((f) => ({ ...f, name: text }))}
             />
           </Field>
-          <Field
-            label="Email"
-            error={
-              form.email.length > 0 && !emailValidation.isValid && emailValidation.error
-                ? t(emailValidation.error)
-                : undefined
-            }
-          >
+          <Field label="Email">
             <TextInput
               style={[
                 s.input,
@@ -272,6 +270,15 @@ export default function ManageDoctorsScreen() {
               value={form.email}
               onChangeText={(text) => setForm((f) => ({ ...f, email: text }))}
             />
+            {form.email.length > 0 ? (
+              <EmailValidationHint
+                email={form.email}
+                validation={emailValidation}
+                onApplySuggestion={(value) =>
+                  setForm((f) => ({ ...f, email: value }))
+                }
+              />
+            ) : null}
           </Field>
           <Field
             label="Password"
