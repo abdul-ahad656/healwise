@@ -46,6 +46,7 @@ build/
 # Node.js dependencies
 # This is the directory created by 'npm install' or 'yarn install'
 node_modules/
+package-lock.json
 
 # Logs
 npm-debug.log*

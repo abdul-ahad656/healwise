@@ -2,9 +2,12 @@ from flask import request, jsonify
 from flask_jwt_extended import get_jwt_identity
 from app.extensions import mongo
 from app.utils.appointment_scheduling import (
+    SLOT_DURATION_MINUTES,
     filter_future_slots,
     is_past_day,
     is_past_slot,
+    normalize_slot,
+    normalize_slots,
     now_local,
     slot_start_string,
     time_to_minutes,
@@ -24,7 +27,22 @@ def set_availability():
     if is_past_day(day):
         return jsonify({"error": "Cannot add availability for a past date"}), 400
 
-    future_slots = filter_future_slots(day, slots)
+    normalized_slots = normalize_slots(slots)
+    if slots and not normalized_slots:
+        return jsonify({
+            "error": f"Each slot must be a valid {SLOT_DURATION_MINUTES}-minute range (e.g. 10:30 - 11:00)"
+        }), 400
+
+    for slot in slots or []:
+        text = str(slot).strip()
+        if not text:
+            continue
+        if normalize_slot(text) is None:
+            return jsonify({
+                "error": f"Invalid slot '{text}'. Use HH:MM - HH:MM with exactly {SLOT_DURATION_MINUTES} minutes between start and end."
+            }), 400
+
+    future_slots = filter_future_slots(day, normalized_slots)
     if not future_slots:
         return jsonify({
             "error": "No valid future time slots. Past times are not allowed."

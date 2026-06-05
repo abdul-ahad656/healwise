@@ -7,6 +7,7 @@ import pytz
 
 TZ = pytz.timezone("Asia/Karachi")
 MIN_CONSULTATION_MINUTES_AUTO_COMPLETE = 30
+SLOT_DURATION_MINUTES = 30
 
 
 def now_local() -> datetime:
@@ -26,6 +27,39 @@ def time_to_minutes(value: str) -> int:
 def slot_start_string(slot: str) -> str:
     match = re.match(r"^(\d{1,2}:\d{2})", str(slot).strip())
     return match.group(1) if match else str(slot).strip()
+
+
+def minutes_to_time(total_minutes: int) -> str:
+    hours = total_minutes // 60
+    minutes = total_minutes % 60
+    return f"{hours:02d}:{minutes:02d}"
+
+
+def normalize_slot(slot: str) -> Optional[str]:
+    """Validate HH:MM - HH:MM with exactly SLOT_DURATION_MINUTES between start and end."""
+    text = str(slot).strip()
+    match = re.match(r"^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$", text)
+    if not match:
+        return None
+    start_min = time_to_minutes(match.group(1))
+    end_min = time_to_minutes(match.group(2))
+    if start_min < 0 or end_min < 0:
+        return None
+    if end_min - start_min != SLOT_DURATION_MINUTES:
+        return None
+    return f"{minutes_to_time(start_min)} - {minutes_to_time(end_min)}"
+
+
+def normalize_slots(slots: list) -> list:
+    cleaned = []
+    seen = set()
+    for slot in slots or []:
+        normalized = normalize_slot(slot)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        cleaned.append(normalized)
+    return sorted(cleaned)
 
 
 def is_past_day(day: str, now: Optional[datetime] = None) -> bool:

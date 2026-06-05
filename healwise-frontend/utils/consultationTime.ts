@@ -2,7 +2,7 @@
 export const CONSULTATION_EARLY_MINUTES = 5;
 
 /** Default slot length when end time is not in the slot string. */
-export const DEFAULT_CONSULTATION_MINUTES = 60;
+export const DEFAULT_CONSULTATION_MINUTES = 30;
 
 export const TELECONSULT_STATUSES = [
   'pending',

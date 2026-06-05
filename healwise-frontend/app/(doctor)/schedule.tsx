@@ -5,29 +5,53 @@ import {
   Text,
   ScrollView,
   Pressable,
-  TextInput,
+  Platform,
 } from 'react-native';
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { Card } from '@/components/ui/card';
 import { DoctorScreenHeader } from '@/components/doctor/DoctorScreenHeader';
 import { DoctorPrimaryButton } from '@/components/doctor/DoctorPrimaryButton';
-import {
-  doctorScreenStyles as s,
-  PLACEHOLDER_COLOR,
-} from '@/styles/doctorScreen';
+import { doctorScreenStyles as s } from '@/styles/doctorScreen';
 import {
   getMyAvailability,
   setMyAvailability,
   deleteMyAvailabilityDay,
   DoctorAvailabilityDay,
 } from '@/services/doctorPanelService';
-import { isPastDay, isPastSlot } from '@/utils/scheduleValidation';
+import {
+  buildSlotFromStartTime,
+  formatTimeLabel,
+  formatYmd,
+  isPastSlot,
+  SLOT_DURATION_MINUTES,
+  startOfToday,
+} from '@/utils/scheduleValidation';
 
 const formatDayLabel = (day: string) => {
-  const date = new Date(day);
+  const match = day.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return day;
+  const date = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3])
+  );
   if (Number.isNaN(date.getTime())) return day;
   const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
   return `${weekday} ${day}`;
+};
+
+const defaultSlotStartTime = () => {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  d.setMinutes(Math.ceil(d.getMinutes() / SLOT_DURATION_MINUTES) * SLOT_DURATION_MINUTES);
+  if (d.getMinutes() >= 60) {
+    d.setMinutes(0);
+    d.setHours(d.getHours() + 1);
+  }
+  return d;
 };
 
 export default function DoctorSchedule() {
@@ -35,10 +59,14 @@ export default function DoctorSchedule() {
   const [availability, setAvailability] = useState<DoctorAvailabilityDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dayInput, setDayInput] = useState('');
-  const [slotInput, setSlotInput] = useState('');
+  const [pickedDate, setPickedDate] = useState(startOfToday);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [slotStartTime, setSlotStartTime] = useState(defaultSlotStartTime);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const minDate = useMemo(() => startOfToday(), []);
 
   const refresh = async () => {
     setError(null);
@@ -98,6 +126,29 @@ export default function DoctorSchedule() {
     );
   };
 
+  const onDateChange = (_event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (!date) return;
+    setPickedDate(date);
+    setError(null);
+  };
+
+  const onTimeChange = (_event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    if (!date) return;
+    const snapped = new Date(date);
+    snapped.setSeconds(0, 0);
+    snapped.setMinutes(
+      Math.round(snapped.getMinutes() / SLOT_DURATION_MINUTES) * SLOT_DURATION_MINUTES
+    );
+    setSlotStartTime(snapped);
+    setError(null);
+  };
+
   const saveSelectedDay = async () => {
     if (!selectedDay) return;
     const dayData = availability.find((d) => d.day === selectedDay);
@@ -128,6 +179,8 @@ export default function DoctorSchedule() {
     }
   };
 
+  const previewSlot = buildSlotFromStartTime(slotStartTime);
+
   return (
     <View style={s.container}>
       <View style={[StyleSheet.absoluteFill, s.pageBg]} />
@@ -151,27 +204,46 @@ export default function DoctorSchedule() {
 
         <Card style={s.formCard}>
           <Text style={s.sectionTitle}>Add / select day</Text>
-          <Text style={s.fieldLabel}>Date (YYYY-MM-DD)</Text>
-          <TextInput
-            value={dayInput}
-            onChangeText={setDayInput}
-            placeholder="2026-05-20"
-            placeholderTextColor={PLACEHOLDER_COLOR}
-            style={[s.input, { marginBottom: 12 }]}
-          />
+          <Text style={s.fieldLabel}>Date</Text>
+          <Pressable
+            onPress={() => {
+              setError(null);
+              setShowDatePicker(true);
+            }}
+            style={({ pressed }) => [local.pickerField, pressed && local.pickerFieldPressed]}
+          >
+            <Text style={local.pickerValue}>{formatYmd(pickedDate)}</Text>
+            <Text style={local.pickerHint}>Tap to open calendar</Text>
+          </Pressable>
+
+          {showDatePicker ? (
+            <DateTimePicker
+              value={pickedDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              minimumDate={minDate}
+              onChange={onDateChange}
+            />
+          ) : null}
+
+          {Platform.OS === 'ios' && showDatePicker ? (
+            <DoctorPrimaryButton
+              label="Done"
+              variant="outline"
+              onPress={() => setShowDatePicker(false)}
+              style={{ marginTop: 8 }}
+            />
+          ) : null}
+
           <DoctorPrimaryButton
             label="Add day"
             variant="primary"
             onPress={() => {
-              const day = dayInput.trim();
-              if (!day) return;
-              if (isPastDay(day)) {
-                setError('Cannot add a past date. Choose today or a future date.');
-                return;
-              }
+              const day = formatYmd(pickedDate);
+              setError(null);
               upsertLocalDay(day);
-              setDayInput('');
             }}
+            style={{ marginTop: 12 }}
           />
 
           {availability.length === 0 ? (
@@ -183,7 +255,10 @@ export default function DoctorSchedule() {
                 return (
                   <Pressable
                     key={d.day}
-                    onPress={() => setSelectedDay(d.day)}
+                    onPress={() => {
+                      setSelectedDay(d.day);
+                      setError(null);
+                    }}
                     style={[local.chip, active && local.chipActive]}
                   >
                     <Text style={[local.chipText, active && local.chipTextActive]}>
@@ -202,27 +277,66 @@ export default function DoctorSchedule() {
             <Text style={s.infoText}>Select a day to manage slots.</Text>
           ) : (
             <>
-              <Text style={s.fieldLabel}>Time range</Text>
-              <TextInput
-                value={slotInput}
-                onChangeText={setSlotInput}
-                placeholder="10:30 - 13:00"
-                placeholderTextColor={PLACEHOLDER_COLOR}
-                style={[s.input, { marginBottom: 12 }]}
-              />
+              <Text style={s.fieldLabel}>
+                Start time ({SLOT_DURATION_MINUTES}-minute slots)
+              </Text>
+              <Pressable
+                onPress={() => {
+                  setError(null);
+                  setShowTimePicker(true);
+                }}
+                style={({ pressed }) => [local.pickerField, pressed && local.pickerFieldPressed]}
+              >
+                <Text style={local.pickerValue}>{formatTimeLabel(slotStartTime)}</Text>
+                <Text style={local.pickerHint}>
+                  {previewSlot
+                    ? `Slot: ${previewSlot}`
+                    : 'Choose a valid start time'}
+                </Text>
+              </Pressable>
+
+              {showTimePicker ? (
+                <DateTimePicker
+                  value={slotStartTime}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  is24Hour
+                  minuteInterval={SLOT_DURATION_MINUTES}
+                  onChange={onTimeChange}
+                />
+              ) : null}
+
+              {Platform.OS === 'ios' && showTimePicker ? (
+                <DoctorPrimaryButton
+                  label="Done"
+                  variant="outline"
+                  onPress={() => setShowTimePicker(false)}
+                  style={{ marginTop: 8 }}
+                />
+              ) : null}
+
               <DoctorPrimaryButton
                 label="Add slot"
                 variant="outline"
                 onPress={() => {
-                  const slot = slotInput.trim();
-                  if (!slot || !selectedDay) return;
+                  if (!selectedDay) return;
+                  setError(null);
+                  const slot = buildSlotFromStartTime(slotStartTime);
+                  if (!slot) {
+                    setError('Invalid start time. Choose a time that fits a 30-minute slot.');
+                    return;
+                  }
                   if (isPastSlot(selectedDay, slot)) {
                     setError('This time has already passed. Choose a future slot.');
                     return;
                   }
+                  if (selected.slots.includes(slot)) {
+                    setError('This slot is already added.');
+                    return;
+                  }
                   addSlotLocal(slot);
-                  setSlotInput('');
                 }}
+                style={{ marginTop: 12 }}
               />
 
               {selected.slots.length === 0 ? (
@@ -232,7 +346,10 @@ export default function DoctorSchedule() {
                   {selected.slots.map((slot) => (
                     <Pressable
                       key={slot}
-                      onPress={() => removeSlotLocal(slot)}
+                      onPress={() => {
+                        removeSlotLocal(slot);
+                        setError(null);
+                      }}
                       style={({ pressed }) => [
                         local.slotChip,
                         { opacity: pressed ? 0.85 : 1 },
@@ -269,6 +386,27 @@ export default function DoctorSchedule() {
 }
 
 const local = StyleSheet.create({
+  pickerField: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+  },
+  pickerFieldPressed: {
+    backgroundColor: '#f9fafb',
+  },
+  pickerValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  pickerHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
+  },
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
