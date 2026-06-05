@@ -1,0 +1,29 @@
+diff --git a/node_modules/@react-native-community/datetimepicker/plugin/build/withDateTimePickerStyles.js b/node_modules/@react-native-community/datetimepicker/plugin/build/withDateTimePickerStyles.js
+index 8601ae9..9b28d83 100644
+--- a/node_modules/@react-native-community/datetimepicker/plugin/build/withDateTimePickerStyles.js
++++ b/node_modules/@react-native-community/datetimepicker/plugin/build/withDateTimePickerStyles.js
+@@ -1,6 +1,6 @@
+ "use strict";
+ Object.defineProperty(exports, "__esModule", { value: true });
+-const config_plugins_1 = require("@expo/config-plugins");
++const config_plugins_1 = require("expo/config-plugins");
+ const moduleName = 'RNDatetimePicker: ';
+ const DATE_PICKER_ALLOWED_ATTRIBUTES = {
+     colorAccent: { attrName: 'colorAccent' },
+@@ -88,10 +88,12 @@ const withDateTimePickerStyles = (baseConfig, options = {}) => {
+         });
+         return config;
+     });
+-    newConfig = (0, config_plugins_1.withAndroidColorsNight)(newConfig, (config) => {
+-        insertColorEntries(android, config, (color) => color.dark);
+-        return config;
+-    });
++    if (typeof config_plugins_1.withAndroidColorsNight === "function") {
++        newConfig = (0, config_plugins_1.withAndroidColorsNight)(newConfig, (config) => {
++            insertColorEntries(android, config, (color) => color.dark);
++            return config;
++        });
++    }
+     newConfig = (0, config_plugins_1.withAndroidStyles)(newConfig, (config) => {
+         config.modResults = setAndroidPickerStyles(config.modResults, android.datePicker, {
+             styleName: DATE_PICKER_STYLE_NAME,

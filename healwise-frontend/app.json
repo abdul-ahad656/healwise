@@ -1,0 +1,82 @@
+{
+  "expo": {
+    "name": "HealWise",
+    "slug": "HealWise",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/app-icon.png",
+    "scheme": "healwisefrontend",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "CFBundleDisplayName": "HealWise"
+      }
+    },
+    "android": {
+      "usesCleartextTraffic": true,
+      "softwareKeyboardLayoutMode": "resize",
+      "edgeToEdgeEnabled": false,
+      "predictiveBackGestureEnabled": false,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/app-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "package": "com.anonymous.healwisefrontend"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/app-icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "./plugins/withBlankAndroidSplash.js",
+      "./plugins/withHealWiseAndroidBranding.js",
+      "./plugins/withZegoMavenRepository.js",
+      [
+        "@react-native-voice/voice",
+        {
+          "microphonePermission": "Allow HealWise to access the microphone to record your symptoms."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#f0fdf4",
+          "dark": {
+            "backgroundColor": "#f0fdf4"
+          }
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.example",
+          "enableGooglePay": true,
+          "enableApplePay": false
+        }
+      ],
+      "expo-font",
+      "expo-localization",
+      "expo-web-browser",
+      "@react-native-community/datetimepicker"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": false
+    },
+    "extra": {
+      "stripePublishableKey": "${EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY}",
+      "router": {},
+      "eas": {
+        "projectId": "1d50f1ce-dd72-47bb-a806-5840a29e4e40"
+      }
+    }
+  }
+}

@@ -69,7 +69,6 @@ ios/.xcode.env.local
 # Expo/React Native specific files (if applicable)
 .expo/
 web-build/
-app.json
 
 # Bundle output
 *.jsbundle

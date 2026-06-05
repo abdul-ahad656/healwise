@@ -9,8 +9,6 @@ from app.utils.appointment_scheduling import (
     normalize_slot,
     normalize_slots,
     now_local,
-    slot_start_string,
-    time_to_minutes,
 )
 from app.utils.slot_locking import filter_slots_for_public_view
 
@@ -68,10 +66,21 @@ def set_availability():
     return jsonify({"message": "Availability updated", "slots": future_slots}), 200
 
 
+def _persist_day_slots(doctor_id, day, slots):
+    query = {"doctorId": doctor_id, "day": day}
+    if slots:
+        mongo.db.doctor_availability.update_one(
+            query,
+            {"$set": {"slots": slots}},
+            upsert=False,
+        )
+    else:
+        mongo.db.doctor_availability.delete_one(query)
+
+
 def get_availability(doctor_id):
     now = now_local()
     now_date = now.strftime("%Y-%m-%d")
-    now_minutes = time_to_minutes(now.strftime("%H:%M"))
 
     availability = list(
         mongo.db.doctor_availability.find({
@@ -85,16 +94,21 @@ def get_availability(doctor_id):
         a["_id"] = str(a["_id"])
         day = a.get("day")
         if is_past_day(day, now):
+            mongo.db.doctor_availability.delete_one({
+                "doctorId": doctor_id,
+                "day": day,
+            })
             continue
-        slots = []
-        for slot in a.get("slots", []):
-            if day == now_date:
-                if time_to_minutes(slot_start_string(slot)) > now_minutes:
-                    slots.append(slot)
-            else:
-                slots.append(slot)
-        if slots:
-            a["slots"] = filter_slots_for_public_view(doctor_id, day, slots)
+
+        original_slots = list(a.get("slots") or [])
+        future_slots = filter_future_slots(day, original_slots, now)
+        if future_slots != original_slots:
+            _persist_day_slots(doctor_id, day, future_slots)
+
+        if not future_slots:
+            continue
+
+        a["slots"] = filter_slots_for_public_view(doctor_id, day, future_slots)
         if a.get("slots"):
             filtered_availability.append(a)
 

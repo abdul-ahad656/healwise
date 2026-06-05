@@ -94,3 +94,22 @@ export function normalizeSlot(slot: string): string | null {
   if (!parsed) return null;
   return `${parsed.start} - ${parsed.end}`;
 }
+
+export function filterFutureSlots(day: string, slots: string[]): string[] {
+  return slots.filter((slot) => {
+    const value = slot.trim();
+    return value && !isPastSlot(day, value);
+  });
+}
+
+export function pruneAvailabilityDays(
+  days: { day: string; slots: string[] }[]
+): { day: string; slots: string[] }[] {
+  return days
+    .filter((entry) => !isPastDay(entry.day))
+    .map((entry) => ({
+      ...entry,
+      slots: filterFutureSlots(entry.day, entry.slots),
+    }))
+    .filter((entry) => entry.slots.length > 0);
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
   Platform,
+  Alert,
 } from 'react-native';
 import DateTimePicker, {
   DateTimePickerEvent,
@@ -23,12 +24,18 @@ import {
 } from '@/services/doctorPanelService';
 import {
   buildSlotFromStartTime,
+  filterFutureSlots,
   formatTimeLabel,
   formatYmd,
+  isPastDay,
   isPastSlot,
   SLOT_DURATION_MINUTES,
   startOfToday,
 } from '@/utils/scheduleValidation';
+
+const showScheduleAlert = (title: string, message: string) => {
+  Alert.alert(title, message);
+};
 
 const formatDayLabel = (day: string) => {
   const match = day.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -65,17 +72,25 @@ export default function DoctorSchedule() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [nowTick, setNowTick] = useState(0);
 
   const minDate = useMemo(() => startOfToday(), []);
+
+  const applyAvailability = useCallback((days: DoctorAvailabilityDay[]) => {
+    const sorted = [...days].sort((a, b) => a.day.localeCompare(b.day));
+    setAvailability(sorted);
+    setSelectedDay((current) => {
+      if (current && sorted.some((d) => d.day === current)) return current;
+      return sorted[0]?.day ?? null;
+    });
+  }, []);
 
   const refresh = async () => {
     setError(null);
     setLoading(true);
     try {
       const data = await getMyAvailability();
-      const sorted = [...data].sort((a, b) => a.day.localeCompare(b.day));
-      setAvailability(sorted);
-      setSelectedDay(sorted[0]?.day ?? null);
+      applyAvailability(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load schedule');
     } finally {
@@ -87,10 +102,65 @@ export default function DoctorSchedule() {
     refresh();
   }, []);
 
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setNowTick((tick) => tick + 1);
+    }, 60000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    if (nowTick === 0) return;
+    getMyAvailability()
+      .then(applyAvailability)
+      .catch(() => {});
+  }, [nowTick, applyAvailability]);
+
+  useEffect(() => {
+    setAvailability((prev) => {
+      let changed = false;
+      const next = prev
+        .filter((entry) => {
+          if (isPastDay(entry.day)) {
+            changed = true;
+            return false;
+          }
+          return true;
+        })
+        .map((entry) => {
+          const futureSlots = filterFutureSlots(entry.day, entry.slots);
+          if (futureSlots.length !== entry.slots.length) {
+            changed = true;
+          }
+          return { ...entry, slots: futureSlots };
+        })
+        .filter((entry) => {
+          if (entry.slots.length === 0) {
+            changed = true;
+            return false;
+          }
+          return true;
+        });
+
+      if (!changed) return prev;
+
+      setSelectedDay((current) => {
+        if (current && next.some((d) => d.day === current)) return current;
+        return next[0]?.day ?? null;
+      });
+      return next;
+    });
+  }, [nowTick]);
+
   const selected = useMemo(
     () => availability.find((a) => a.day === selectedDay) || null,
     [availability, selectedDay]
   );
+
+  const visibleSlots = useMemo(() => {
+    if (!selected) return [];
+    return filterFutureSlots(selected.day, selected.slots);
+  }, [selected, nowTick]);
 
   const upsertLocalDay = (day: string) => {
     const trimmed = day.trim();
@@ -153,13 +223,23 @@ export default function DoctorSchedule() {
     if (!selectedDay) return;
     const dayData = availability.find((d) => d.day === selectedDay);
     if (!dayData) return;
+    const futureSlots = filterFutureSlots(dayData.day, dayData.slots);
+    if (futureSlots.length === 0) {
+      showScheduleAlert(
+        'No future slots',
+        'All slots for this day are in the past. Add a future slot or delete the day.'
+      );
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      await setMyAvailability(dayData.day, dayData.slots);
+      await setMyAvailability(dayData.day, futureSlots);
       await refresh();
     } catch (err: any) {
-      setError(err.message || 'Failed to save schedule');
+      const message = err.message || 'Failed to save schedule';
+      setError(message);
+      showScheduleAlert('Could not save', message);
     } finally {
       setSaving(false);
     }
@@ -323,15 +403,21 @@ export default function DoctorSchedule() {
                   setError(null);
                   const slot = buildSlotFromStartTime(slotStartTime);
                   if (!slot) {
-                    setError('Invalid start time. Choose a time that fits a 30-minute slot.');
+                    showScheduleAlert(
+                      'Invalid time',
+                      'Choose a start time that fits a 30-minute slot.'
+                    );
                     return;
                   }
                   if (isPastSlot(selectedDay, slot)) {
-                    setError('This time has already passed. Choose a future slot.');
+                    showScheduleAlert(
+                      'Past time',
+                      'This time has already passed. Choose a future slot.'
+                    );
                     return;
                   }
                   if (selected.slots.includes(slot)) {
-                    setError('This slot is already added.');
+                    showScheduleAlert('Duplicate slot', 'This slot is already added.');
                     return;
                   }
                   addSlotLocal(slot);
@@ -339,11 +425,11 @@ export default function DoctorSchedule() {
                 style={{ marginTop: 12 }}
               />
 
-              {selected.slots.length === 0 ? (
+              {visibleSlots.length === 0 ? (
                 <Text style={[s.infoText, { marginTop: 12 }]}>No slots for this day.</Text>
               ) : (
                 <View style={local.slotsGrid}>
-                  {selected.slots.map((slot) => (
+                  {visibleSlots.map((slot) => (
                     <Pressable
                       key={slot}
                       onPress={() => {

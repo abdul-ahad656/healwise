@@ -74,6 +74,9 @@
     "typescript": "~5.9.2"
   },
   "private": true,
+  "overrides": {
+    "@expo/config-plugins": "~54.0.4"
+  },
   "expo": {
     "doctor": {
       "reactNativeDirectoryCheck": {
