@@ -32,6 +32,12 @@ export interface Appointment {
   patientMarkedComplete?: boolean;
   doctorMarkedComplete?: boolean;
   completionType?: string;
+  consultationStartedAt?: string | null;
+  paymentId?: string;
+  paymentMethod?: 'stripe' | 'easypaisa';
+  paymentStatus?: string;
+  patientJoinedAt?: string | null;
+  doctorJoinedAt?: string | null;
 }
 
 export interface SymptomHistoryItem {
@@ -144,6 +150,29 @@ export const cancelAppointment = async (appointmentId: string): Promise<void> =>
   const data = await response.json();
   if (!response.ok) {
     throw new Error(data.error || 'Failed to cancel appointment');
+  }
+};
+
+export const cancelAppointmentWithRefund = async (
+  appointmentId: string,
+  reason: string,
+  easypaisaNumber: string
+): Promise<void> => {
+  const headers = getAuthHeaders();
+  const response = await fetch(
+    `${API_BASE_URL}/appointments/${appointmentId}/cancel-with-refund`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        reason,
+        easypaisa_number: easypaisaNumber,
+      }),
+    }
+  );
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to submit refund request');
   }
 };
 

@@ -144,6 +144,52 @@ export function isJoinableStatus(status: string): status is JoinableStatus {
   return (JOINABLE_STATUSES as readonly string[]).includes(status);
 }
 
+export function canPatientJoinTeleconsult(
+  status: string,
+  appointmentDate: string,
+  appointmentTime: string,
+  consultationStartedAt?: string | null
+): ConsultationWindow {
+  if (status === 'pending') {
+    return {
+      canJoin: false,
+      message: 'Accept this appointment before starting a video call',
+      minutesUntilStart: null,
+    };
+  }
+
+  if (!isJoinableStatus(status)) {
+    return {
+      canJoin: false,
+      message: 'This appointment is not available for video consultation',
+      minutesUntilStart: null,
+    };
+  }
+
+  if (!consultationStartedAt) {
+    return {
+      canJoin: false,
+      message: 'Your doctor will start the consultation when ready',
+      minutesUntilStart: null,
+    };
+  }
+
+  if (status !== 'in_progress') {
+    return {
+      canJoin: false,
+      message: 'Wait for your doctor to start the video consultation',
+      minutesUntilStart: null,
+    };
+  }
+
+  const window = getAppointmentWindow(appointmentDate, appointmentTime);
+  return {
+    canJoin: window.canJoin,
+    message: window.message,
+    minutesUntilStart: window.minutesUntilStart,
+  };
+}
+
 export function canStartTeleconsult(
   status: string,
   appointmentDate: string,

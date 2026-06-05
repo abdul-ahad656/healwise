@@ -67,6 +67,8 @@ export default function PatientLayout() {
       <Tabs.Screen name="medicine-history/index" options={{ href: null }} />
       <Tabs.Screen name="medicine-history/detail" options={{ href: null }} />
       <Tabs.Screen name="appointment-history/index" options={{ href: null }} />
+      <Tabs.Screen name="update-profile" options={{ href: null }} />
+      <Tabs.Screen name="refunds/index" options={{ href: null }} />
     </Tabs>
   );
 }

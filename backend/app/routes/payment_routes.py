@@ -10,6 +10,10 @@ from app.controllers.payment_controller import (
     refund_payment_handler,
     get_pending_easypaisa_for_admin,
     get_admin_approved_payments_handler,
+    get_my_refund_requests_handler,
+    get_pending_refunds_for_admin_handler,
+    admin_approve_refund_handler,
+    admin_reject_refund_handler,
 )
 
 payment_bp = Blueprint("payment_bp", __name__)
@@ -75,3 +79,27 @@ def payment_history():
 def refund():
     """Request a refund for a payment."""
     return refund_payment_handler()
+
+
+@payment_bp.get("/refunds/my")
+@jwt_required()
+def my_refunds():
+    return get_my_refund_requests_handler()
+
+
+@payment_bp.get("/admin/pending-refunds")
+@jwt_required()
+def admin_pending_refunds():
+    return get_pending_refunds_for_admin_handler()
+
+
+@payment_bp.post("/admin/approve-refund")
+@jwt_required()
+def admin_approve_refund():
+    return admin_approve_refund_handler()
+
+
+@payment_bp.post("/admin/reject-refund")
+@jwt_required()
+def admin_reject_refund():
+    return admin_reject_refund_handler()

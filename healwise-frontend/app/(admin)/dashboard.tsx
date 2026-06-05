@@ -39,6 +39,21 @@ export default function AdminDashboard() {
         </Pressable>
 
         <Pressable
+          onPress={() => router.push('/(admin)/refunds')}
+          style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, marginBottom: 14 }]}
+        >
+          <Card style={dash.card}>
+            <View style={dash.cardIcon}>
+              <CreditCard size={22} color="#0f172a" />
+            </View>
+            <Text style={dash.cardTitle}>Refund requests</Text>
+            <Text style={dash.cardSubtitle}>
+              Approve cancelled appointment refunds
+            </Text>
+          </Card>
+        </Pressable>
+
+        <Pressable
           onPress={() => router.push('/(admin)/manage-doctors')}
           style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, marginBottom: 14 }]}
         >

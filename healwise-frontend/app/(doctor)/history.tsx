@@ -22,6 +22,7 @@ import {
   SymptomHistoryItem,
 } from '@/services/doctorPanelService';
 import { RescheduleSlotPicker } from '@/components/scheduling/RescheduleSlotPicker';
+import { canCancelAppointment } from '@/utils/appointmentActions';
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -62,7 +63,12 @@ export default function HistoryScreen() {
     }
   };
 
-  const handleCancel = (appointmentId: string) => {
+  const handleCancel = (appointment: Appointment) => {
+    const check = canCancelAppointment(appointment);
+    if (!check.allowed) {
+      Alert.alert('Cannot cancel', check.reason || 'Consultation time was recorded.');
+      return;
+    }
     Alert.alert('Cancel appointment', 'Cancel this appointment?', [
       { text: 'No', style: 'cancel' },
       {
@@ -70,7 +76,7 @@ export default function HistoryScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await cancelAppointment(appointmentId);
+            await cancelAppointment(appointment._id);
             await refresh();
           } catch (err: any) {
             Alert.alert('Error', err.message || 'Failed to cancel');
@@ -260,7 +266,8 @@ export default function HistoryScreen() {
                     <DoctorPrimaryButton
                       label="Cancel appointment"
                       variant="danger"
-                      onPress={() => handleCancel(a._id)}
+                      onPress={() => handleCancel(a)}
+                      disabled={!canCancelAppointment(a).allowed}
                     />
                   </>
                 )}

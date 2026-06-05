@@ -381,3 +381,101 @@ export const getPaymentMethodLabel = (method: PaymentMethod): string => {
       return 'Unknown';
   }
 };
+
+export interface RefundRequest {
+  _id: string;
+  appointmentId: string;
+  paymentId: string;
+  reason: string;
+  easypaisa_number: string;
+  amount: number;
+  currency?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  refundProofUrl?: string;
+  requestedAt?: string;
+  processedAt?: string;
+  adminNotes?: string;
+  appointmentDate?: string;
+  appointmentTime?: string;
+  patientName?: string;
+}
+
+export const getMyRefundRequests = async (): Promise<RefundRequest[]> => {
+  const token = AuthStore.getToken();
+  if (!token) throw new Error('User not authenticated');
+
+  const response = await fetch(`${API_BASE_URL}/payments/refunds/my`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to load refund requests');
+  }
+  return data as RefundRequest[];
+};
+
+export const getPendingRefundsAdmin = async (): Promise<RefundRequest[]> => {
+  const token = AuthStore.getToken();
+  if (!token) throw new Error('User not authenticated');
+
+  const response = await fetch(`${API_BASE_URL}/payments/admin/pending-refunds`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to load refund requests');
+  }
+  return (data.refunds || []) as RefundRequest[];
+};
+
+export const approveRefundAdmin = async (
+  refundId: string,
+  imageUri: string,
+  fileName: string,
+  adminNotes?: string
+): Promise<void> => {
+  const token = AuthStore.getToken();
+  if (!token) throw new Error('User not authenticated');
+
+  const formData = new FormData();
+  formData.append('refund_id', refundId);
+  if (adminNotes) formData.append('admin_notes', adminNotes);
+  formData.append('refund_proof', {
+    uri: imageUri,
+    name: fileName,
+    type: proofImageMimeType(fileName),
+  } as any);
+
+  const response = await fetch(`${API_BASE_URL}/payments/admin/approve-refund`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to approve refund');
+  }
+};
+
+export const rejectRefundAdmin = async (
+  refundId: string,
+  adminNotes?: string
+): Promise<void> => {
+  const token = AuthStore.getToken();
+  if (!token) throw new Error('User not authenticated');
+
+  const response = await fetch(`${API_BASE_URL}/payments/admin/reject-refund`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ refund_id: refundId, admin_notes: adminNotes }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to reject refund');
+  }
+};

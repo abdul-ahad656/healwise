@@ -35,6 +35,7 @@ export default function AdminLayout() {
       <Tabs.Screen name="manage-doctors" options={{ href: null }} />
       <Tabs.Screen name="manage-health-tips" options={{ href: null }} />
       <Tabs.Screen name="manage-medicine" options={{ href: null }} />
+      <Tabs.Screen name="refunds" options={{ href: null }} />
     </Tabs>
   );
 }

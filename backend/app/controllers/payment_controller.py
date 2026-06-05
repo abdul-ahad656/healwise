@@ -29,7 +29,10 @@ from app.services.payment_service import (
     get_doctor_consultation_price,
     validate_payment_method,
 )
-from app.services.cloudinary_service import upload_payment_proof_to_cloudinary
+from app.services.cloudinary_service import (
+    upload_payment_proof_to_cloudinary,
+    upload_refund_proof_to_cloudinary,
+)
 from app.utils.slot_locking import (
     SlotUnavailableError,
     acquire_slot_lock,
@@ -914,3 +917,144 @@ def get_admin_approved_payments_handler():
 
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve approved payments: {str(e)}"}), 500
+
+
+def _serialize_refund_request(doc):
+    if not doc:
+        return doc
+    out = dict(doc)
+    out["_id"] = str(out["_id"])
+    for key in ("requestedAt", "processedAt", "updatedAt"):
+        val = out.get(key)
+        if val is not None and hasattr(val, "isoformat"):
+            out[key] = val.isoformat()
+    return out
+
+
+def get_my_refund_requests_handler():
+    try:
+        user_id = get_jwt_identity()
+        claims = get_jwt()
+        if claims.get("role") != "patient":
+            return jsonify({"error": "Only patients can view refund requests"}), 403
+
+        from app.models.refund_request_model import get_patient_refund_requests
+
+        rows = get_patient_refund_requests(user_id)
+        return jsonify([_serialize_refund_request(row) for row in rows]), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to load refund requests: {str(e)}"}), 500
+
+
+def get_pending_refunds_for_admin_handler():
+    try:
+        claims = get_jwt()
+        if claims.get("role") != "admin":
+            return jsonify({"error": "Only admins can view refund requests"}), 403
+
+        from app.models.refund_request_model import get_pending_refund_requests
+
+        rows = get_pending_refund_requests()
+        enriched = []
+        for row in rows:
+            item = _serialize_refund_request(row)
+            patient = find_user_by_id(item.get("patientId"))
+            if patient:
+                item["patientName"] = patient.get("name") or patient.get("email")
+            enriched.append(item)
+        return jsonify({"total": len(enriched), "refunds": enriched}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to load refund requests: {str(e)}"}), 500
+
+
+def admin_approve_refund_handler():
+    try:
+        admin_id = get_jwt_identity()
+        claims = get_jwt()
+        if claims.get("role") != "admin":
+            return jsonify({"error": "Only admins can approve refunds"}), 403
+
+        refund_id = (request.form.get("refund_id") or "").strip()
+        admin_notes = (request.form.get("admin_notes") or "").strip() or None
+        proof_file = request.files.get("refund_proof") if request.files else None
+
+        if not refund_id:
+            data = request.get_json(silent=True) or {}
+            refund_id = (data.get("refund_id") or "").strip()
+            admin_notes = (data.get("admin_notes") or "").strip() or None
+
+        if not refund_id:
+            return jsonify({"error": "refund_id is required"}), 400
+
+        file_error = _validate_payment_proof_file(proof_file)
+        if file_error:
+            return jsonify({"error": file_error}), 400
+
+        from app.models.refund_request_model import (
+            approve_refund_request,
+            find_refund_request_by_id,
+        )
+
+        refund = find_refund_request_by_id(refund_id)
+        if not refund:
+            return jsonify({"error": "Refund request not found"}), 404
+        if refund.get("status") != "pending":
+            return jsonify({"error": "Only pending refund requests can be approved"}), 400
+
+        upload = upload_refund_proof_to_cloudinary(proof_file, refund_id)
+        approve_refund_request(refund_id, admin_id, upload["url"], admin_notes)
+
+        payment_id = refund.get("paymentId")
+        if payment_id:
+            try:
+                update_payment_status(
+                    ObjectId(payment_id),
+                    "refunded",
+                    {
+                        "refundProofUrl": upload["url"],
+                        "refundedAt": datetime.utcnow(),
+                        "adminNotes": admin_notes,
+                    },
+                )
+            except Exception:
+                pass
+
+        return jsonify({
+            "message": "Refund approved and proof uploaded",
+            "refundRequestId": refund_id,
+            "refundProofUrl": upload["url"],
+        }), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to approve refund: {str(e)}"}), 500
+
+
+def admin_reject_refund_handler():
+    try:
+        admin_id = get_jwt_identity()
+        claims = get_jwt()
+        if claims.get("role") != "admin":
+            return jsonify({"error": "Only admins can reject refunds"}), 403
+
+        data = request.json or {}
+        refund_id = (data.get("refund_id") or "").strip()
+        admin_notes = (data.get("admin_notes") or "").strip() or None
+
+        if not refund_id:
+            return jsonify({"error": "refund_id is required"}), 400
+
+        from app.models.refund_request_model import (
+            find_refund_request_by_id,
+            reject_refund_request,
+        )
+
+        refund = find_refund_request_by_id(refund_id)
+        if not refund:
+            return jsonify({"error": "Refund request not found"}), 404
+        if refund.get("status") != "pending":
+            return jsonify({"error": "Only pending refund requests can be rejected"}), 400
+
+        reject_refund_request(refund_id, admin_id, admin_notes)
+
+        return jsonify({"message": "Refund request rejected", "refundRequestId": refund_id}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to reject refund: {str(e)}"}), 500

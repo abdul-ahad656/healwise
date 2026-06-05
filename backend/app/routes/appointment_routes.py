@@ -11,6 +11,7 @@ from app.controllers.appointment_controller import (
 )
 from app.controllers.appointment_actions import (
     cancel_appointment,
+    cancel_appointment_with_refund,
     reschedule_appointment,
     mark_appointment_complete,
     record_consultation_join,
@@ -62,6 +63,12 @@ def start_consult(appointment_id):
 @jwt_required()
 def cancel_appt(appointment_id):
     return cancel_appointment(appointment_id)
+
+
+@appointment_bp.post("/<appointment_id>/cancel-with-refund")
+@jwt_required()
+def cancel_with_refund_appt(appointment_id):
+    return cancel_appointment_with_refund(appointment_id)
 
 
 @appointment_bp.post("/<appointment_id>/reschedule")

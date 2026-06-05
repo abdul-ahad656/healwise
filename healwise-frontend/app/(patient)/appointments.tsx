@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Video, Calendar, Clock, User } from 'lucide-react-native';
@@ -21,16 +23,21 @@ import { RescheduleSlotPicker } from '@/components/scheduling/RescheduleSlotPick
 import {
   getPatientAppointments,
   cancelAppointment,
+  cancelAppointmentWithRefund,
   rescheduleAppointment,
   markAppointmentComplete,
   Appointment,
 } from '@/services/doctorPanelService';
 import { isPastAppointment } from '@/utils/appointmentHistory';
+import {
+  canCancelAppointment,
+  shouldUseRefundCancellation,
+} from '@/utils/appointmentActions';
 import AuthStore from '@/services/authStore';
 import { patientScreenStyles as s } from '@/styles/patientScreen';
 import {
   CONSULTATION_EARLY_MINUTES,
-  canStartTeleconsult,
+  canPatientJoinTeleconsult,
   isJoinableStatus,
 } from '@/utils/consultationTime';
 
@@ -59,6 +66,12 @@ function translateJoinMessage(
   if (message === 'This appointment is not available for video consultation') {
     return t('appointments_not_available_video');
   }
+  if (message === 'Your doctor will start the consultation when ready') {
+    return t('appointments_wait_doctor_start');
+  }
+  if (message === 'Wait for your doctor to start the video consultation') {
+    return t('appointments_wait_doctor_in_progress');
+  }
   if (message.includes('minutes before start')) {
     return t('appointments_join_available_before', {
       early: CONSULTATION_EARLY_MINUTES,
@@ -85,6 +98,10 @@ export default function AppointmentsScreen() {
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleTime, setRescheduleTime] = useState('');
+  const [refundTarget, setRefundTarget] = useState<Appointment | null>(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundNumber, setRefundNumber] = useState('');
+  const [submittingRefund, setSubmittingRefund] = useState(false);
 
   useEffect(() => {
     loadAppointments();
@@ -129,10 +146,11 @@ export default function AppointmentsScreen() {
       return;
     }
 
-    const window = canStartTeleconsult(
+    const window = canPatientJoinTeleconsult(
       appointment.status,
       appointment.appointmentDate,
-      appointment.appointmentTime
+      appointment.appointmentTime,
+      appointment.consultationStartedAt
     );
 
     if (!window.canJoin) {
@@ -271,13 +289,16 @@ export default function AppointmentsScreen() {
         ) : (
           appointments.map((appointment) => {
             const statusColor = getStatusColor(appointment.status);
-            const joinWindow = canStartTeleconsult(
+            const joinWindow = canPatientJoinTeleconsult(
               appointment.status,
               appointment.appointmentDate,
-              appointment.appointmentTime
+              appointment.appointmentTime,
+              appointment.consultationStartedAt
             );
             const canJoin =
               isJoinableStatus(appointment.status) && joinWindow.canJoin;
+            const cancelCheck = canCancelAppointment(appointment);
+            const useRefundCancel = shouldUseRefundCancellation(appointment);
 
             return (
               <Card key={appointment._id} style={local.card}>
@@ -430,27 +451,49 @@ export default function AppointmentsScreen() {
                       }}
                     />
                     <PatientPrimaryButton
-                      label="Cancel appointment"
+                      label={
+                        useRefundCancel
+                          ? t('appointments_cancel_refund')
+                          : t('appointments_cancel')
+                      }
                       variant="danger"
+                      disabled={!cancelCheck.allowed}
                       onPress={() => {
-                        Alert.alert('Cancel', 'Cancel this appointment?', [
-                          { text: 'No', style: 'cancel' },
-                          {
-                            text: 'Yes',
-                            style: 'destructive',
-                            onPress: async () => {
-                              try {
-                                await cancelAppointment(appointment._id);
-                                await loadAppointments();
-                              } catch (err: unknown) {
-                                Alert.alert(
-                                  'Error',
-                                  err instanceof Error ? err.message : 'Failed'
-                                );
-                              }
+                        if (!cancelCheck.allowed) {
+                          Alert.alert(
+                            t('appointments_cannot_cancel_title'),
+                            cancelCheck.reason || t('appointments_cannot_cancel')
+                          );
+                          return;
+                        }
+                        if (useRefundCancel) {
+                          setRefundTarget(appointment);
+                          setRefundReason('');
+                          setRefundNumber('');
+                          return;
+                        }
+                        Alert.alert(
+                          t('appointments_cancel_title'),
+                          t('appointments_cancel_confirm'),
+                          [
+                            { text: t('appointments_no'), style: 'cancel' },
+                            {
+                              text: t('appointments_yes'),
+                              style: 'destructive',
+                              onPress: async () => {
+                                try {
+                                  await cancelAppointment(appointment._id);
+                                  await loadAppointments();
+                                } catch (err: unknown) {
+                                  Alert.alert(
+                                    'Error',
+                                    err instanceof Error ? err.message : 'Failed'
+                                  );
+                                }
+                              },
                             },
-                          },
-                        ]);
+                          ]
+                        );
                       }}
                     />
                   </View>
@@ -503,6 +546,82 @@ export default function AppointmentsScreen() {
           })
         )}
       </ScrollView>
+
+      <Modal
+        visible={!!refundTarget}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRefundTarget(null)}
+      >
+        <View style={local.modalBackdrop}>
+          <View style={local.modalCard}>
+            <Text style={local.modalTitle}>{t('appointments_cancel_refund')}</Text>
+            <Text style={local.modalHint}>{t('appointments_refund_hint')}</Text>
+            <Text style={local.modalLabel}>{t('appointments_refund_reason')}</Text>
+            <TextInput
+              value={refundReason}
+              onChangeText={setRefundReason}
+              placeholder={t('appointments_refund_reason_placeholder')}
+              placeholderTextColor="#9ca3af"
+              multiline
+              style={local.modalInput}
+            />
+            <Text style={local.modalLabel}>{t('appointments_refund_number')}</Text>
+            <TextInput
+              value={refundNumber}
+              onChangeText={setRefundNumber}
+              placeholder="03XXXXXXXXX"
+              placeholderTextColor="#9ca3af"
+              keyboardType="phone-pad"
+              style={local.modalInput}
+            />
+            <View style={local.modalActions}>
+              <PatientPrimaryButton
+                label={t('appointments_no')}
+                variant="outline"
+                onPress={() => setRefundTarget(null)}
+              />
+              <PatientPrimaryButton
+                label={
+                  submittingRefund
+                    ? t('profile_saving')
+                    : t('appointments_submit_refund')
+                }
+                variant="danger"
+                disabled={
+                  submittingRefund ||
+                  !refundReason.trim() ||
+                  refundNumber.trim().length < 10
+                }
+                onPress={async () => {
+                  if (!refundTarget) return;
+                  setSubmittingRefund(true);
+                  try {
+                    await cancelAppointmentWithRefund(
+                      refundTarget._id,
+                      refundReason.trim(),
+                      refundNumber.trim()
+                    );
+                    setRefundTarget(null);
+                    Alert.alert(
+                      t('appointments_title'),
+                      t('appointments_refund_submitted')
+                    );
+                    await loadAppointments();
+                  } catch (err: unknown) {
+                    Alert.alert(
+                      'Error',
+                      err instanceof Error ? err.message : 'Failed'
+                    );
+                  } finally {
+                    setSubmittingRefund(false);
+                  }
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -679,5 +798,51 @@ const local = StyleSheet.create({
     backgroundColor: '#f9fafb',
     borderWidth: 1,
     borderColor: '#e5e7eb',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 32,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  modalHint: {
+    fontSize: 13,
+    color: '#6b7280',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  modalLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#111827',
+    backgroundColor: '#ffffff',
+    minHeight: 44,
+  },
+  modalActions: {
+    marginTop: 16,
+    gap: 10,
   },
 });

@@ -22,6 +22,11 @@ from app.utils.slot_locking import (
     has_active_appointment,
     release_slot_lock,
 )
+from app.models.payment_model import find_payment_by_id, update_payment_status
+from app.models.refund_request_model import (
+    create_refund_request,
+    find_pending_refund_for_appointment,
+)
 
 _CANCELLABLE = {"pending", "accepted", "confirmed", "in_progress"}
 _RESCHEDULABLE = {"pending", "accepted", "confirmed"}
@@ -50,6 +55,27 @@ def _user_may_access(appointment, user_id: str, role: str):
 def _consultation_minutes(appointment) -> float:
     seconds = int(appointment.get("consultationDurationSeconds") or 0)
     return seconds / 60.0
+
+
+def _has_recorded_consultation(appointment) -> bool:
+    """True when any consultation time was recorded or both parties joined."""
+    if int(appointment.get("consultationDurationSeconds") or 0) > 0:
+        return True
+    if appointment.get("patientJoinedAt") and appointment.get("doctorJoinedAt"):
+        return True
+    return False
+
+
+def _assert_can_cancel(appointment):
+    if _has_recorded_consultation(appointment):
+        minutes = round(_consultation_minutes(appointment), 1)
+        return jsonify({
+            "error": (
+                "Cannot cancel this appointment because consultation time was recorded."
+            ),
+            "consultationDurationMinutes": minutes,
+        }), 400
+    return None
 
 
 def _finalize_completion(appointment_id, completion_type: str, extra=None):
@@ -119,6 +145,10 @@ def cancel_appointment(appointment_id: str):
             "error": f"Cannot cancel appointment with status {appointment.get('status')}"
         }), 400
 
+    block = _assert_can_cancel(appointment)
+    if block:
+        return block
+
     mongo.db.appointments.update_one(
         {"_id": appointment["_id"]},
         {
@@ -138,6 +168,114 @@ def cancel_appointment(appointment_id: str):
     )
 
     return jsonify({"message": "Appointment cancelled", "status": "cancelled"}), 200
+
+
+def cancel_appointment_with_refund(appointment_id: str):
+    """Patient cancels a paid Easypaisa appointment and submits a refund request."""
+    user_id = get_jwt_identity()
+    claims = get_jwt()
+    role = claims.get("role")
+    data = request.json or {}
+
+    if role != "patient":
+        return jsonify({"error": "Only patients can request a refund cancellation"}), 403
+
+    reason = (data.get("reason") or "").strip()
+    easypaisa_number = (
+        data.get("easypaisa_number") or data.get("easypaisaNumber") or ""
+    ).strip()
+
+    if not reason:
+        return jsonify({"error": "Refund reason is required"}), 400
+    if len(reason) > 500:
+        return jsonify({"error": "Reason is too long"}), 400
+    if not easypaisa_number or len(easypaisa_number) < 10:
+        return jsonify({"error": "Valid Easypaisa number is required"}), 400
+
+    appointment, err_resp, err_code = _find_appointment(appointment_id)
+    if err_resp:
+        return err_resp, err_code
+
+    if str(appointment.get("patientId")) != str(user_id):
+        return jsonify({"error": "You cannot cancel this appointment"}), 403
+
+    if appointment.get("status") not in _CANCELLABLE:
+        return jsonify({
+            "error": f"Cannot cancel appointment with status {appointment.get('status')}"
+        }), 400
+
+    block = _assert_can_cancel(appointment)
+    if block:
+        return block
+
+    payment_id = appointment.get("paymentId")
+    if not payment_id:
+        return jsonify({"error": "No payment is linked to this appointment"}), 400
+
+    try:
+        payment = find_payment_by_id(ObjectId(str(payment_id)))
+    except Exception:
+        payment = None
+
+    if not payment or str(payment.get("userId")) != str(user_id):
+        return jsonify({"error": "Payment not found for this appointment"}), 404
+
+    if payment.get("payment_method") != "easypaisa":
+        return jsonify({
+            "error": "Manual refund requests apply to Easypaisa payments only"
+        }), 400
+
+    if payment.get("status") not in ("paid", "succeeded"):
+        return jsonify({"error": "This payment is not eligible for refund"}), 400
+
+    if find_pending_refund_for_appointment(str(appointment["_id"])):
+        return jsonify({"error": "A refund request already exists for this appointment"}), 400
+
+    mongo.db.appointments.update_one(
+        {"_id": appointment["_id"]},
+        {
+            "$set": {
+                "status": "cancelled",
+                "cancelledAt": datetime.utcnow(),
+                "cancelledBy": "patient",
+                "paymentStatus": "refund_pending",
+                "updatedAt": datetime.utcnow(),
+            }
+        },
+    )
+
+    amount = payment.get("doctor_consultation_price") or payment.get("amount") or 0
+    refund_request_id = create_refund_request({
+        "patientId": str(user_id),
+        "appointmentId": str(appointment["_id"]),
+        "paymentId": str(payment["_id"]),
+        "reason": reason,
+        "easypaisa_number": easypaisa_number,
+        "amount": amount,
+        "currency": payment.get("currency") or "pkr",
+        "patientName": claims.get("name") or "",
+        "doctorId": str(appointment.get("doctorId")),
+        "appointmentDate": appointment.get("appointmentDate"),
+        "appointmentTime": appointment.get("appointmentTime"),
+    })
+
+    update_payment_status(
+        payment["_id"],
+        "refund_pending",
+        {"refundRequestId": str(refund_request_id)},
+    )
+
+    release_slot_lock(
+        str(appointment.get("doctorId")),
+        appointment.get("appointmentDate"),
+        appointment.get("appointmentTime"),
+    )
+
+    return jsonify({
+        "message": "Appointment cancelled. Refund request submitted for admin review.",
+        "status": "cancelled",
+        "refundRequestId": str(refund_request_id),
+    }), 200
 
 
 def reschedule_appointment(appointment_id: str):
@@ -304,14 +442,25 @@ def record_consultation_join(appointment_id: str):
     if appointment.get("status") in ("cancelled", "rejected", "completed"):
         return jsonify({"error": "Appointment is not active"}), 400
 
+    if role == "patient":
+        if not appointment.get("consultationStartedAt"):
+            return jsonify({
+                "error": "Your doctor must start the consultation before you can join"
+            }), 403
+        if appointment.get("status") != "in_progress":
+            return jsonify({
+                "error": "Consultation is not in progress yet. Wait for your doctor."
+            }), 403
+
     join_field = "patientJoinedAt" if role == "patient" else "doctorJoinedAt"
     update = {"updatedAt": datetime.utcnow()}
     if not appointment.get(join_field):
         update[join_field] = datetime.utcnow()
-    if not appointment.get("consultationStartedAt"):
-        update["consultationStartedAt"] = datetime.utcnow()
-    if appointment.get("status") in ("accepted", "confirmed"):
-        update["status"] = "in_progress"
+    if role == "doctor":
+        if not appointment.get("consultationStartedAt"):
+            update["consultationStartedAt"] = datetime.utcnow()
+        if appointment.get("status") in ("accepted", "confirmed"):
+            update["status"] = "in_progress"
 
     mongo.db.appointments.update_one({"_id": appointment["_id"]}, {"$set": update})
 

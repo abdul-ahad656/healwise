@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import re
 import pytz
 from app.models.user_model import find_user_by_id
+from app.models.payment_model import find_payment_by_id
 
 
 TZ = pytz.timezone('Asia/Karachi')
@@ -42,6 +43,20 @@ def _serialize_appointment_for_response(doc):
         if val is not None and hasattr(val, "isoformat"):
             out[key] = val.isoformat()
     return out
+
+
+def _attach_payment_info(row):
+    payment_id = row.get("paymentId")
+    if not payment_id:
+        return row
+    try:
+        payment = find_payment_by_id(ObjectId(str(payment_id)))
+    except Exception:
+        payment = None
+    if payment:
+        row["paymentMethod"] = payment.get("payment_method")
+        row["paymentStatus"] = payment.get("status") or row.get("paymentStatus")
+    return row
 
 
 def _doctor_appointments_query(doctor_id):
@@ -183,7 +198,7 @@ def get_my_appointments():
         row["consultationDurationMinutes"] = round(
             int(row.get("consultationDurationSeconds") or 0) / 60.0, 1
         )
-        payload.append(row)
+        payload.append(_attach_payment_info(row))
 
     return jsonify(payload), 200
 
@@ -207,7 +222,7 @@ def doctor_appointments():
         row["consultationDurationMinutes"] = round(
             int(row.get("consultationDurationSeconds") or 0) / 60.0, 1
         )
-        payload.append(row)
+        payload.append(_attach_payment_info(row))
 
     return jsonify(payload), 200
 
