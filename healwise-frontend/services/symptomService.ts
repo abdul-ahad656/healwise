@@ -26,10 +26,22 @@ export function formatSymptomLabel(value: string): string {
   return value.replace(/_/g, ' ');
 }
 
+export interface SymptomTranslationMapping {
+  input: string;
+  english: string;
+  token: string;
+}
+
+export interface ResolveSymptomsResult {
+  symptoms: string[];
+  mappings: SymptomTranslationMapping[];
+}
+
 export interface SymptomSuggestionResult {
   selected_symptoms: string[];
   suggestions: string[];
   can_analyze: boolean;
+  mappings?: SymptomTranslationMapping[];
 }
 
 export interface SymptomPrediction {
@@ -71,6 +83,42 @@ function normalizeSymptomHistoryEntry(raw: Record<string, unknown>): SymptomHist
           : undefined,
   };
 }
+
+/** Split comma-separated raw user input (Urdu, roman Urdu, or English). */
+export function splitSymptomInput(value: string): string[] {
+  return value
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+export const resolveSymptomsToEnglish = async (
+  rawSymptoms: string[]
+): Promise<ResolveSymptomsResult> => {
+  const token = AuthStore.getToken();
+
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const { response, data } = await fetchJson<ResolveSymptomsResult & { error?: string }>(
+    `${API_BASE_URL}/symptoms/resolve-english`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ symptoms: rawSymptoms }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Could not translate symptoms to English');
+  }
+
+  return data;
+};
 
 export const suggestSymptoms = async (
   symptoms: string[]

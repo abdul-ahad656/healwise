@@ -37,6 +37,15 @@ def _cached_translate(text: str, source: str = "en", target: str = "ur") -> str:
     return text
 
 
+def translate_to_english(text: Any, source: str = "auto") -> str:
+  """
+  Safely translate arbitrary value to English text for ML / search.
+  """
+  if text is None:
+    return ""
+  return _cached_translate(str(text), source=source, target="en")
+
+
 def translate_to_urdu(text: Any) -> str:
   """
   Public helper used by views/services.

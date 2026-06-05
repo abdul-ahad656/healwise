@@ -18,7 +18,8 @@ import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import {
   analyzeSymptoms,
   suggestSymptoms,
-  parseSymptomInput,
+  resolveSymptomsToEnglish,
+  splitSymptomInput,
   formatSymptomLabel,
 } from '@/services/symptomService';
 import {
@@ -31,7 +32,7 @@ import { useTranslation } from 'react-i18next';
 export default function SymptomChecker() {
   const router = useRouter();
   const isFocused = useIsFocused();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [symptomInput, setSymptomInput] = useState('');
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
@@ -41,6 +42,9 @@ export default function SymptomChecker() {
   const [predictionLoading, setPredictionLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [translationNote, setTranslationNote] = useState<string | null>(null);
+
+  const voiceLocale = i18n.language?.startsWith('ur') ? 'ur-PK' : 'en-US';
 
   const isVoiceSupported = isVoicePlatformSupported();
   const isVoiceLinked = isVoiceNativeLinked();
@@ -69,20 +73,38 @@ export default function SymptomChecker() {
 
   const handleAddSymptom = useCallback(
     async (raw: string) => {
-      const tokens = parseSymptomInput(raw);
-      if (tokens.length === 0) return;
-
-      const newcomers = tokens.filter((token) => !selectedSymptoms.includes(token));
-      if (newcomers.length === 0) {
-        setError(t('symptom_duplicate'));
-        return;
-      }
+      const rawParts = splitSymptomInput(raw);
+      if (rawParts.length === 0) return;
 
       setError(null);
-      setSymptomInput('');
-      const updated = [...selectedSymptoms, ...newcomers];
-      setSelectedSymptoms(updated);
-      await fetchSuggestions(updated);
+      setTranslationNote(null);
+      try {
+        const resolved = await resolveSymptomsToEnglish(rawParts);
+        const newcomers = resolved.symptoms.filter(
+          (token) => !selectedSymptoms.includes(token)
+        );
+        if (newcomers.length === 0) {
+          setError(t('symptom_duplicate'));
+          return;
+        }
+
+        const translated = resolved.mappings.filter(
+          (m) => m.input.trim() !== m.english.trim()
+        );
+        if (translated.length > 0) {
+          setTranslationNote(
+            translated.map((m) => `${m.input} → ${m.english}`).join(', ')
+          );
+        }
+
+        setSymptomInput('');
+        const updated = [...selectedSymptoms, ...newcomers];
+        setSelectedSymptoms(updated);
+        await fetchSuggestions(updated);
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : t('generic_error');
+        setError(message);
+      }
     },
     [selectedSymptoms, fetchSuggestions, t]
   );
@@ -133,9 +155,24 @@ export default function SymptomChecker() {
       }
     };
     Voice.onSpeechResults = (e) => {
-      if (isFocused && e.value && e.value[0]) {
-        setSymptomInput(e.value[0]);
-      }
+      if (!isFocused || !e.value?.[0]) return;
+      void (async () => {
+        try {
+          const resolved = await resolveSymptomsToEnglish([e.value![0]]);
+          const label = resolved.symptoms.map((s) => formatSymptomLabel(s)).join(', ');
+          setSymptomInput(label || e.value![0]);
+          const translated = resolved.mappings.filter(
+            (m) => m.input.trim() !== m.english.trim()
+          );
+          if (translated.length > 0) {
+            setTranslationNote(
+              translated.map((m) => `${m.input} → ${m.english}`).join(', ')
+            );
+          }
+        } catch {
+          setSymptomInput(e.value![0]);
+        }
+      })();
     };
 
     return () => {
@@ -161,6 +198,7 @@ export default function SymptomChecker() {
         setSuggestions([]);
         setCanAnalyze(false);
         setError(null);
+        setTranslationNote(null);
       };
     }, [])
   );
@@ -184,7 +222,7 @@ export default function SymptomChecker() {
         await Voice.stop();
       } else {
         setError(null);
-        await Voice.start('en-US');
+        await Voice.start(voiceLocale);
       }
     } catch (e) {
       console.error(e);
@@ -225,10 +263,19 @@ export default function SymptomChecker() {
           </View>
         )}
 
+        {translationNote && (
+          <View style={styles.noteCard}>
+            <Info size={20} color="#059669" />
+            <Text style={styles.noteText}>
+              {t('symptom_translated_note', { note: translationNote })}
+            </Text>
+          </View>
+        )}
+
         <Card style={styles.card}>
           <Text style={styles.cardTitle}>{t('describe_symptoms')}</Text>
 
-          <View style={[styles.inputRow, isListening && styles.inputRowActive]}>
+          <View style={[styles.inputContainer, isListening && styles.inputContainerActive]}>
             <TextInput
               placeholder={
                 isListening
@@ -241,35 +288,43 @@ export default function SymptomChecker() {
               onSubmitEditing={onSubmitInput}
               returnKeyType="done"
               style={styles.input}
+              multiline
+              numberOfLines={2}
               editable={!busy}
             />
 
-            <Pressable
-              onPress={toggleListening}
-              style={[styles.micButton, isListening && styles.micButtonActive]}
-              disabled={predictionLoading}
-            >
-              {isListening ? (
-                <MicOff size={18} color="white" />
-              ) : (
-                <Mic size={18} color="#6b7280" />
-              )}
-            </Pressable>
+            <View style={styles.inputActions}>
+              <Pressable
+                onPress={toggleListening}
+                style={[styles.micButton, isListening && styles.micButtonActive]}
+                disabled={predictionLoading}
+              >
+                {isListening ? (
+                  <MicOff size={18} color="white" />
+                ) : (
+                  <Mic size={18} color="#6b7280" />
+                )}
+              </Pressable>
 
-            <Pressable
-              onPress={onSubmitInput}
-              disabled={!symptomInput.trim() || busy}
-              style={[
-                styles.addButton,
-                (!symptomInput.trim() || busy) && styles.addButtonDisabled,
-              ]}
-            >
-              <Plus size={18} color="white" />
-            </Pressable>
+              <Pressable
+                onPress={onSubmitInput}
+                disabled={!symptomInput.trim() || busy}
+                style={[
+                  styles.addButton,
+                  (!symptomInput.trim() || busy) && styles.addButtonDisabled,
+                ]}
+              >
+                <Plus size={18} color="white" />
+                <Text style={styles.addButtonText}>{t('symptom_add_button')}</Text>
+              </Pressable>
+            </View>
           </View>
 
           {!isVoiceLinked && isVoiceSupported && (
             <Text style={styles.voiceUnavailableHint}>{t('voice_native_unavailable')}</Text>
+          )}
+          {i18n.language?.startsWith('ur') && (
+            <Text style={styles.voiceUnavailableHint}>{t('symptom_voice_urdu_hint')}</Text>
           )}
           {isListening && (
             <Text style={styles.listeningHint}>{t('listening_hint')}</Text>
@@ -363,20 +418,32 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20 },
   card: { padding: 20, borderRadius: 20, backgroundColor: 'white', elevation: 5 },
   cardTitle: { fontSize: 16, fontWeight: '600', color: '#374151', marginBottom: 16 },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  inputContainer: {
     backgroundColor: '#f9fafb',
     borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#e5e7eb',
     marginBottom: 12,
-    gap: 8,
   },
-  inputRowActive: { borderColor: '#ef4444', backgroundColor: '#fff5f5' },
-  input: { flex: 1, fontSize: 16, color: '#1f2937', paddingVertical: 8 },
+  inputContainerActive: { borderColor: '#ef4444', backgroundColor: '#fff5f5' },
+  input: {
+    minHeight: 56,
+    maxHeight: 96,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#1f2937',
+    textAlignVertical: 'top',
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+    marginBottom: 12,
+  },
+  inputActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
   micButton: {
     width: 36,
     height: 36,
@@ -388,13 +455,15 @@ const styles = StyleSheet.create({
   },
   micButtonActive: { backgroundColor: '#ef4444' },
   addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#ef4444',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#ef4444',
   },
+  addButtonText: { color: 'white', fontSize: 14, fontWeight: '600' },
   addButtonDisabled: { opacity: 0.45 },
   voiceUnavailableHint: { fontSize: 12, color: '#9ca3af', marginBottom: 12, lineHeight: 18 },
   listeningHint: {
@@ -463,4 +532,16 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   errorText: { flex: 1, color: '#ef4444', fontSize: 14 },
+  noteCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#ecfdf5',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    marginBottom: 16,
+    gap: 10,
+  },
+  noteText: { flex: 1, color: '#047857', fontSize: 13, lineHeight: 20 },
 });

@@ -45,6 +45,17 @@ from app.models.user_model import find_user_by_id
 from app.models.symptom_model import get_user_symptoms
 from app.services.symptom_service import process_and_store_symptom, SymptomServiceError
 from app.services.hf_service import HFServiceError
+from app.utils.symptom_translation import resolve_symptoms_to_english
+
+
+def _symptoms_text_to_english(text: str) -> str:
+    parts = [part.strip() for part in text.split(",") if part.strip()]
+    if not parts:
+        return text
+    mappings = resolve_symptoms_to_english(parts)
+    if not mappings:
+        return text
+    return ", ".join(item["english"] for item in mappings)
 
 
 def submit_symptoms():
@@ -54,6 +65,8 @@ def submit_symptoms():
     text = (data.get("text") or "").strip()
     if not text:
         return jsonify({"error": "Symptoms text is required"}), 400
+
+    text = _symptoms_text_to_english(text)
 
     user = find_user_by_id(user_id)
     if not user:

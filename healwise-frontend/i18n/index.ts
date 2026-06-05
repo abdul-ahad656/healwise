@@ -73,6 +73,8 @@ const resources = {
       symptom_min_three_hint: "Please select at least 3 symptoms for better analysis",
       symptom_no_suggestions: "No further suggestions for this combination",
       symptom_duplicate: "This symptom is already selected",
+      symptom_translated_note: "Converted to English for analysis: {{note}}",
+      symptom_voice_urdu_hint: "Urdu voice input is converted to English automatically for the AI model.",
       speech_error: "Speech recognition error / آواز پہچاننے میں مسئلہ",
       voice_native_unavailable:
         "Voice module is not linked. Run npm install (applies patch), then npx expo run:android — or type symptoms.",
@@ -360,6 +362,8 @@ const resources = {
       symptom_min_three_hint: "بہتر تجزیہ کے لیے کم از کم 3 علامات منتخب کریں",
       symptom_no_suggestions: "اس مجموعہ کے لیے مزید تجاویز نہیں",
       symptom_duplicate: "یہ علامات پہلے سے منتخب ہیں",
+      symptom_translated_note: "تجزیہ کے لیے انگریزی میں تبدیل: {{note}}",
+      symptom_voice_urdu_hint: "اردو آواز خودکار طور پر انگریزی میں تبدیل ہوتی ہے۔",
       speech_error: "آواز پہچاننے میں مسئلہ",
       voice_native_unavailable:
         "وائس ماڈیول منسلک نہیں۔ npm install چلائیں، پھر expo run:android — یا علامات ٹائپ کریں۔",
