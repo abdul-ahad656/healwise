@@ -24,6 +24,7 @@ import {
 } from '@/services/doctorPanelService';
 import {
   buildSlotFromStartTime,
+  clampSlotStartTime,
   filterFutureSlots,
   formatTimeLabel,
   formatYmd,
@@ -50,16 +51,7 @@ const formatDayLabel = (day: string) => {
   return `${weekday} ${day}`;
 };
 
-const defaultSlotStartTime = () => {
-  const d = new Date();
-  d.setSeconds(0, 0);
-  d.setMinutes(Math.ceil(d.getMinutes() / SLOT_DURATION_MINUTES) * SLOT_DURATION_MINUTES);
-  if (d.getMinutes() >= 60) {
-    d.setMinutes(0);
-    d.setHours(d.getHours() + 1);
-  }
-  return d;
-};
+const defaultSlotStartTime = () => clampSlotStartTime(new Date());
 
 export default function DoctorSchedule() {
   const router = useRouter();
@@ -210,12 +202,7 @@ export default function DoctorSchedule() {
       setShowTimePicker(false);
     }
     if (!date) return;
-    const snapped = new Date(date);
-    snapped.setSeconds(0, 0);
-    snapped.setMinutes(
-      Math.round(snapped.getMinutes() / SLOT_DURATION_MINUTES) * SLOT_DURATION_MINUTES
-    );
-    setSlotStartTime(snapped);
+    setSlotStartTime(clampSlotStartTime(date));
     setError(null);
   };
 
@@ -371,7 +358,7 @@ export default function DoctorSchedule() {
                 <Text style={local.pickerHint}>
                   {previewSlot
                     ? `Slot: ${previewSlot}`
-                    : 'Choose a valid start time'}
+                    : 'Latest slot: 23:00 – 23:30'}
                 </Text>
               </Pressable>
 
@@ -405,7 +392,7 @@ export default function DoctorSchedule() {
                   if (!slot) {
                     showScheduleAlert(
                       'Invalid time',
-                      'Choose a start time that fits a 30-minute slot.'
+                      'Choose a start time on a 30-minute mark. The latest slot is 23:00–23:30.'
                     );
                     return;
                   }

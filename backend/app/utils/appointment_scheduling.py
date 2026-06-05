@@ -45,6 +45,8 @@ def normalize_slot(slot: str) -> Optional[str]:
     end_min = time_to_minutes(match.group(2))
     if start_min < 0 or end_min < 0:
         return None
+    if end_min >= 24 * 60:
+        return None
     if end_min - start_min != SLOT_DURATION_MINUTES:
         return None
     return f"{minutes_to_time(start_min)} - {minutes_to_time(end_min)}"

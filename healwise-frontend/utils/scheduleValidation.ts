@@ -2,6 +2,9 @@
 
 export const SLOT_DURATION_MINUTES = 30;
 
+/** Latest allowed start so the slot still ends before midnight (23:00 → 23:30). */
+export const MAX_SLOT_START_MINUTES = 24 * 60 - 2 * SLOT_DURATION_MINUTES;
+
 export function todayYmd(): string {
   const d = new Date();
   const y = d.getFullYear();
@@ -46,8 +49,30 @@ export function slotStart(value: string): string {
 export function buildSlotFromStartMinutes(startMinutes: number): string | null {
   if (startMinutes < 0 || startMinutes > 23 * 60 + 59) return null;
   const endMinutes = startMinutes + SLOT_DURATION_MINUTES;
-  if (endMinutes > 24 * 60) return null;
+  if (endMinutes >= 24 * 60) return null;
   return `${minutesToTime(startMinutes)} - ${minutesToTime(endMinutes)}`;
+}
+
+export function isValidSlotStartMinutes(startMinutes: number): boolean {
+  return (
+    startMinutes >= 0 &&
+    startMinutes % SLOT_DURATION_MINUTES === 0 &&
+    startMinutes <= MAX_SLOT_START_MINUTES
+  );
+}
+
+export function clampSlotStartTime(date: Date): Date {
+  const clamped = new Date(date);
+  clamped.setSeconds(0, 0);
+  clamped.setMinutes(
+    Math.round(clamped.getMinutes() / SLOT_DURATION_MINUTES) * SLOT_DURATION_MINUTES
+  );
+  const startMinutes = clamped.getHours() * 60 + clamped.getMinutes();
+  if (startMinutes > MAX_SLOT_START_MINUTES) {
+    clamped.setHours(Math.floor(MAX_SLOT_START_MINUTES / 60));
+    clamped.setMinutes(MAX_SLOT_START_MINUTES % 60);
+  }
+  return clamped;
 }
 
 export function buildSlotFromStartTime(date: Date): string | null {
