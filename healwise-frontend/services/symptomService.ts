@@ -1,5 +1,22 @@
 import { API_BASE_URL } from './config';
 import AuthStore from './authStore';
+import { fetchJson } from './httpClient';
+
+export function normalizeSymptomToken(value: string): string {
+  const s = value.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!s) return '';
+  return s.replace(/ /g, '_');
+}
+
+export function formatSymptomLabel(value: string): string {
+  return value.replace(/_/g, ' ');
+}
+
+export interface SymptomSuggestionResult {
+  selected_symptoms: string[];
+  suggestions: string[];
+  can_analyze: boolean;
+}
 
 export interface SymptomPrediction {
   label: string;
@@ -40,6 +57,34 @@ function normalizeSymptomHistoryEntry(raw: Record<string, unknown>): SymptomHist
           : undefined,
   };
 }
+
+export const suggestSymptoms = async (
+  symptoms: string[]
+): Promise<SymptomSuggestionResult> => {
+  const token = AuthStore.getToken();
+
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const { response, data } = await fetchJson<SymptomSuggestionResult & { error?: string }>(
+    `${API_BASE_URL}/suggest-symptoms`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ symptoms }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to fetch symptom suggestions');
+  }
+
+  return data;
+};
 
 export const analyzeSymptoms = async (text: string): Promise<SymptomAnalysisResult> => {
   const token = AuthStore.getToken();

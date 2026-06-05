@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -11,11 +11,16 @@ import {
 import { useRouter, type Href } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Mic, MicOff, Search, Info } from 'lucide-react-native';
+import { Mic, MicOff, Search, Info, Plus, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card } from '@/components/ui/card';
 import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
-import { analyzeSymptoms } from '@/services/symptomService';
+import {
+  analyzeSymptoms,
+  suggestSymptoms,
+  normalizeSymptomToken,
+  formatSymptomLabel,
+} from '@/services/symptomService';
 import {
   getVoiceModule,
   isVoiceNativeLinked,
@@ -27,12 +32,89 @@ export default function SymptomChecker() {
   const router = useRouter();
   const isFocused = useIsFocused();
   const { t } = useTranslation();
-  const [symptoms, setSymptoms] = useState('');
-  const [loading, setLoading] = useState(false);
+
+  const [symptomInput, setSymptomInput] = useState('');
+  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [canAnalyze, setCanAnalyze] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [predictionLoading, setPredictionLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const isVoiceSupported = isVoicePlatformSupported();
   const isVoiceLinked = isVoiceNativeLinked();
+
+  const fetchSuggestions = useCallback(async (updatedSymptoms: string[]) => {
+    if (updatedSymptoms.length === 0) {
+      setSuggestions([]);
+      setCanAnalyze(false);
+      return;
+    }
+
+    setLoadingSuggestions(true);
+    setError(null);
+    try {
+      const result = await suggestSymptoms(updatedSymptoms);
+      setSelectedSymptoms(result.selected_symptoms);
+      setSuggestions(result.suggestions);
+      setCanAnalyze(result.can_analyze);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : t('generic_error');
+      setError(message);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, [t]);
+
+  const handleAddSymptom = useCallback(
+    async (raw: string) => {
+      const normalized = normalizeSymptomToken(raw);
+      if (!normalized) return;
+
+      if (selectedSymptoms.includes(normalized)) {
+        setError(t('symptom_duplicate'));
+        return;
+      }
+
+      setError(null);
+      setSymptomInput('');
+      const updated = [...selectedSymptoms, normalized];
+      setSelectedSymptoms(updated);
+      await fetchSuggestions(updated);
+    },
+    [selectedSymptoms, fetchSuggestions, t]
+  );
+
+  const handleRemoveSymptom = useCallback(
+    async (symptom: string) => {
+      const updated = selectedSymptoms.filter((s) => s !== symptom);
+      setSelectedSymptoms(updated);
+      setError(null);
+      await fetchSuggestions(updated);
+    },
+    [selectedSymptoms, fetchSuggestions]
+  );
+
+  const handleAnalyze = async () => {
+    if (!canAnalyze || selectedSymptoms.length < 3) return;
+
+    const text = selectedSymptoms.map((s) => formatSymptomLabel(s)).join(', ');
+    setPredictionLoading(true);
+    setError(null);
+    try {
+      const result = await analyzeSymptoms(text);
+      router.push({
+        pathname: '/(patient)/symptom-checker/result',
+        params: { data: JSON.stringify(result) },
+      });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : t('generic_error');
+      setError(message);
+    } finally {
+      setPredictionLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!isVoiceSupported || !isVoiceLinked || !isFocused) return;
@@ -44,14 +126,14 @@ export default function SymptomChecker() {
     Voice.onSpeechEnd = () => setIsListening(false);
     Voice.onSpeechError = (e) => {
       if (isFocused) {
-        setError(t("speech_error"));
+        setError(t('speech_error'));
         setIsListening(false);
         console.error(e);
       }
     };
     Voice.onSpeechResults = (e) => {
       if (isFocused && e.value && e.value[0]) {
-        setSymptoms((prev) => prev + (prev ? " " : "") + e.value![0]);
+        setSymptomInput(e.value[0]);
       }
     };
 
@@ -73,7 +155,10 @@ export default function SymptomChecker() {
   useFocusEffect(
     React.useCallback(() => {
       return () => {
-        setSymptoms('');
+        setSymptomInput('');
+        setSelectedSymptoms([]);
+        setSuggestions([]);
+        setCanAnalyze(false);
         setError(null);
       };
     }, [])
@@ -82,16 +167,16 @@ export default function SymptomChecker() {
   const toggleListening = async () => {
     try {
       if (!isVoiceSupported) {
-        setError("Voice input is not supported on this platform");
+        setError('Voice input is not supported on this platform');
         return;
       }
       if (!isVoiceLinked) {
-        setError(t("voice_native_unavailable"));
+        setError(t('voice_native_unavailable'));
         return;
       }
       const Voice = getVoiceModule();
       if (!Voice) {
-        setError(t("voice_native_unavailable"));
+        setError(t('voice_native_unavailable'));
         return;
       }
       if (isListening) {
@@ -102,32 +187,22 @@ export default function SymptomChecker() {
       }
     } catch (e) {
       console.error(e);
-      setError(t("speech_error"));
+      setError(t('speech_error'));
     }
   };
 
-  const handleCheck = async () => {
-    if (!symptoms.trim()) return;
-
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await analyzeSymptoms(symptoms);
-      router.push({
-        pathname: "/(patient)/symptom-checker/result",
-        params: { data: JSON.stringify(result) }
-      });
-      } catch (error: any) {
-      setError(error.message || t("generic_error"));
-    } finally {
-      setLoading(false);
+  const onSubmitInput = () => {
+    if (symptomInput.trim()) {
+      void handleAddSymptom(symptomInput);
     }
   };
+
+  const busy = loadingSuggestions || predictionLoading || isListening;
 
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={["#fef2f2", "#ffffff", "#fff7ed"]}
+        colors={['#fef2f2', '#ffffff', '#fff7ed']}
         style={StyleSheet.absoluteFill}
       />
 
@@ -137,8 +212,8 @@ export default function SymptomChecker() {
         onBack={() => router.navigate('/(patient)/home' as Href)}
       />
 
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -150,58 +225,127 @@ export default function SymptomChecker() {
         )}
 
         <Card style={styles.card}>
-          <Text style={styles.cardTitle}>{t("describe_symptoms")}</Text>
-          
-          <View style={[styles.inputContainer, isListening && styles.inputActive]}>
+          <Text style={styles.cardTitle}>{t('describe_symptoms')}</Text>
+
+          <View style={[styles.inputRow, isListening && styles.inputRowActive]}>
             <TextInput
-              placeholder={isListening ? t("symptom_placeholder_listening") : t("symptom_placeholder_typing")}
-              placeholderTextColor={isListening ? "#ef4444" : "#9CA3AF"}
-              value={symptoms}
-              onChangeText={setSymptoms}
-              multiline
+              placeholder={
+                isListening
+                  ? t('symptom_placeholder_listening')
+                  : t('symptom_add_placeholder')
+              }
+              placeholderTextColor={isListening ? '#ef4444' : '#9CA3AF'}
+              value={symptomInput}
+              onChangeText={setSymptomInput}
+              onSubmitEditing={onSubmitInput}
+              returnKeyType="done"
               style={styles.input}
+              editable={!busy}
             />
-            
-            <Pressable 
+
+            <Pressable
               onPress={toggleListening}
               style={[styles.micButton, isListening && styles.micButtonActive]}
+              disabled={predictionLoading}
             >
               {isListening ? (
-                <MicOff size={20} color="white" />
+                <MicOff size={18} color="white" />
               ) : (
-                <Mic size={20} color="#6b7280" />
+                <Mic size={18} color="#6b7280" />
               )}
+            </Pressable>
+
+            <Pressable
+              onPress={onSubmitInput}
+              disabled={!symptomInput.trim() || busy}
+              style={[
+                styles.addButton,
+                (!symptomInput.trim() || busy) && styles.addButtonDisabled,
+              ]}
+            >
+              <Plus size={18} color="white" />
             </Pressable>
           </View>
 
           {!isVoiceLinked && isVoiceSupported && (
-            <Text style={styles.voiceUnavailableHint}>{t("voice_native_unavailable")}</Text>
+            <Text style={styles.voiceUnavailableHint}>{t('voice_native_unavailable')}</Text>
           )}
           {isListening && (
-            <Text style={styles.listeningHint}>{t("listening_hint")}</Text>
+            <Text style={styles.listeningHint}>{t('listening_hint')}</Text>
+          )}
+
+          {selectedSymptoms.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('symptom_selected_title')}</Text>
+              <View style={styles.chipsRow}>
+                {selectedSymptoms.map((symptom) => (
+                  <Pressable
+                    key={symptom}
+                    onPress={() => void handleRemoveSymptom(symptom)}
+                    style={styles.selectedChip}
+                    disabled={busy}
+                  >
+                    <Text style={styles.selectedChipText}>
+                      {formatSymptomLabel(symptom)}
+                    </Text>
+                    <X size={14} color="#b91c1c" />
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {selectedSymptoms.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('symptom_suggestions_title')}</Text>
+              {loadingSuggestions ? (
+                <ActivityIndicator color="#ef4444" style={styles.suggestionsLoader} />
+              ) : suggestions.length > 0 ? (
+                <View style={styles.chipsRow}>
+                  {suggestions.map((symptom) => (
+                    <Pressable
+                      key={symptom}
+                      onPress={() => void handleAddSymptom(symptom)}
+                      style={styles.suggestionChip}
+                      disabled={busy}
+                    >
+                      <Text style={styles.suggestionChipText}>
+                        {formatSymptomLabel(symptom)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.noSuggestionsText}>{t('symptom_no_suggestions')}</Text>
+              )}
+            </View>
+          )}
+
+          {!canAnalyze && selectedSymptoms.length > 0 && (
+            <Text style={styles.hintText}>{t('symptom_min_three_hint')}</Text>
           )}
 
           <Pressable
-            onPress={handleCheck}
-            disabled={!symptoms.trim() || loading || isListening}
+            onPress={() => void handleAnalyze()}
+            disabled={!canAnalyze || busy}
             style={({ pressed }) => [
               styles.checkButtonWrapper,
-              (!symptoms.trim() || loading || isListening) && { opacity: 0.5 },
-              pressed && { opacity: 0.9 }
+              (!canAnalyze || busy) && { opacity: 0.5 },
+              pressed && { opacity: 0.9 },
             ]}
           >
             <LinearGradient
-              colors={["#ef4444", "#f97316"]}
+              colors={['#ef4444', '#f97316']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.checkButton}
             >
-              {loading ? (
+              {predictionLoading ? (
                 <ActivityIndicator color="white" />
               ) : (
                 <>
                   <Search size={20} color="white" />
-                  <Text style={styles.checkButtonText}>{t("analyze_symptoms")}</Text>
+                  <Text style={styles.checkButtonText}>{t('analyze_symptoms')}</Text>
                 </>
               )}
             </LinearGradient>
@@ -218,36 +362,104 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20 },
   card: { padding: 20, borderRadius: 20, backgroundColor: 'white', elevation: 5 },
   cardTitle: { fontSize: 16, fontWeight: '600', color: '#374151', marginBottom: 16 },
-  inputContainer: {
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#f9fafb',
     borderRadius: 16,
-    padding: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    minHeight: 150,
     marginBottom: 12,
+    gap: 8,
   },
-  inputActive: { borderColor: '#ef4444', backgroundColor: '#fff5f5' },
-  input: { fontSize: 16, color: '#1f2937', textAlignVertical: 'top', flex: 1, lineHeight: 24 },
+  inputRowActive: { borderColor: '#ef4444', backgroundColor: '#fff5f5' },
+  input: { flex: 1, fontSize: 16, color: '#1f2937', paddingVertical: 8 },
   micButton: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
+    elevation: 2,
   },
   micButtonActive: { backgroundColor: '#ef4444' },
-  micButtonDisabled: { opacity: 0.55 },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addButtonDisabled: { opacity: 0.45 },
   voiceUnavailableHint: { fontSize: 12, color: '#9ca3af', marginBottom: 12, lineHeight: 18 },
-  listeningHint: { textAlign: 'center', color: '#ef4444', fontSize: 12, marginBottom: 15, fontWeight: '500' },
-  checkButtonWrapper: { borderRadius: 12, overflow: 'hidden' },
-  checkButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, gap: 8 },
+  listeningHint: {
+    textAlign: 'center',
+    color: '#ef4444',
+    fontSize: 12,
+    marginBottom: 12,
+    fontWeight: '500',
+  },
+  section: { marginBottom: 16 },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4b5563',
+    marginBottom: 10,
+  },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  selectedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  selectedChipText: { fontSize: 14, fontWeight: '600', color: '#b91c1c' },
+  suggestionChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: '#fed7aa',
+    backgroundColor: '#fff7ed',
+  },
+  suggestionChipText: { fontSize: 14, fontWeight: '600', color: '#c2410c' },
+  suggestionsLoader: { marginVertical: 8 },
+  noSuggestionsText: { fontSize: 13, color: '#9ca3af', lineHeight: 20 },
+  hintText: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 14,
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
+  checkButtonWrapper: { borderRadius: 12, overflow: 'hidden', marginTop: 4 },
+  checkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    gap: 8,
+  },
   checkButtonText: { color: 'white', fontWeight: '600', fontSize: 16 },
-  errorCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef2f2', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#fee2e2', marginBottom: 20, gap: 12 },
+  errorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fee2e2',
+    marginBottom: 20,
+    gap: 12,
+  },
   errorText: { flex: 1, color: '#ef4444', fontSize: 14 },
 });
