@@ -97,10 +97,6 @@ export default function DoctorConsultation() {
                             ? `PKR ${doctor.consultationFee}`
                             : t("doctor_fee_not_set")}
                         </Text>
-                        <View style={styles.ratingRow}>
-                          <Star size={12} color="#eab308" fill="#eab308" />
-                          <Text style={styles.ratingText}>{doctor.rating}</Text>
-                        </View>
                       </View>
                     </View>
                     
