@@ -45,11 +45,15 @@ from app.models.user_model import find_user_by_id
 from app.models.symptom_model import get_user_symptoms
 from app.services.symptom_service import process_and_store_symptom, SymptomServiceError
 from app.services.hf_service import HFServiceError
-from app.utils.symptom_translation import resolve_symptoms_to_english
+from app.utils.symptom_translation import (
+    collect_raw_symptom_inputs,
+    resolve_symptoms_to_english,
+    split_user_symptom_text,
+)
 
 
 def _symptoms_text_to_english(text: str) -> str:
-    parts = [part.strip() for part in text.split(",") if part.strip()]
+    parts = split_user_symptom_text(text)
     if not parts:
         return text
     mappings = resolve_symptoms_to_english(parts)

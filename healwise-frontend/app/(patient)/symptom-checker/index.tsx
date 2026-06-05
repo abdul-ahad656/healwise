@@ -19,11 +19,12 @@ import {
   analyzeSymptoms,
   suggestSymptoms,
   resolveSymptomsToEnglish,
-  splitSymptomInput,
   formatSymptomLabel,
 } from '@/services/symptomService';
 import {
   getVoiceModule,
+  getVoiceRecognitionLocale,
+  isBenignSpeechError,
   isVoiceNativeLinked,
   isVoicePlatformSupported,
 } from '@/services/voiceRecognition';
@@ -44,7 +45,7 @@ export default function SymptomChecker() {
   const [error, setError] = useState<string | null>(null);
   const [translationNote, setTranslationNote] = useState<string | null>(null);
 
-  const voiceLocale = i18n.language?.startsWith('ur') ? 'ur-PK' : 'en-US';
+  const voiceLocale = getVoiceRecognitionLocale(i18n.language);
 
   const isVoiceSupported = isVoicePlatformSupported();
   const isVoiceLinked = isVoiceNativeLinked();
@@ -73,13 +74,12 @@ export default function SymptomChecker() {
 
   const handleAddSymptom = useCallback(
     async (raw: string) => {
-      const rawParts = splitSymptomInput(raw);
-      if (rawParts.length === 0) return;
+      if (!raw.trim()) return;
 
       setError(null);
       setTranslationNote(null);
       try {
-        const resolved = await resolveSymptomsToEnglish(rawParts);
+        const resolved = await resolveSymptomsToEnglish(raw.trim());
         const newcomers = resolved.symptoms.filter(
           (token) => !selectedSymptoms.includes(token)
         );
@@ -148,17 +148,19 @@ export default function SymptomChecker() {
     Voice.onSpeechStart = () => setIsListening(true);
     Voice.onSpeechEnd = () => setIsListening(false);
     Voice.onSpeechError = (e) => {
-      if (isFocused) {
-        setError(t('speech_error'));
-        setIsListening(false);
-        console.error(e);
+      if (!isFocused) return;
+      setIsListening(false);
+      if (isBenignSpeechError(e)) {
+        setError(t('speech_no_match'));
+        return;
       }
+      setError(t('speech_error'));
     };
     Voice.onSpeechResults = (e) => {
       if (!isFocused || !e.value?.[0]) return;
       void (async () => {
         try {
-          const resolved = await resolveSymptomsToEnglish([e.value![0]]);
+          const resolved = await resolveSymptomsToEnglish(e.value![0]);
           const label = resolved.symptoms.map((s) => formatSymptomLabel(s)).join(', ');
           setSymptomInput(label || e.value![0]);
           const translated = resolved.mappings.filter(
@@ -225,7 +227,10 @@ export default function SymptomChecker() {
         await Voice.start(voiceLocale);
       }
     } catch (e) {
-      console.error(e);
+      if (isBenignSpeechError(e)) {
+        setError(t('speech_no_match'));
+        return;
+      }
       setError(t('speech_error'));
     }
   };
@@ -260,15 +265,6 @@ export default function SymptomChecker() {
           <View style={styles.errorCard}>
             <Info size={24} color="#ef4444" />
             <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        {translationNote && (
-          <View style={styles.noteCard}>
-            <Info size={20} color="#059669" />
-            <Text style={styles.noteText}>
-              {t('symptom_translated_note', { note: translationNote })}
-            </Text>
           </View>
         )}
 

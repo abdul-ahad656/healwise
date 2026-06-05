@@ -57,7 +57,6 @@ export default function PatientLayout() {
       <Tabs.Screen name="health-tips" options={{ href: null }} />
       <Tabs.Screen name="medicine-awareness" options={{ href: null }} />
       <Tabs.Screen name="medicine-compare" options={{ href: null }} />
-      <Tabs.Screen name="feedback" options={{ href: null }} />
       <Tabs.Screen name="ai-analysis" options={{ href: null }} />
       <Tabs.Screen name="consult-doctor/index" options={{ href: null }} />
       <Tabs.Screen name="consult-doctor/booking" options={{ href: null }} />

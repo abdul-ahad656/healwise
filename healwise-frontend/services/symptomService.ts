@@ -93,13 +93,18 @@ export function splitSymptomInput(value: string): string[] {
 }
 
 export const resolveSymptomsToEnglish = async (
-  rawSymptoms: string[]
+  input: string | string[]
 ): Promise<ResolveSymptomsResult> => {
   const token = AuthStore.getToken();
 
   if (!token) {
     throw new Error('User not authenticated');
   }
+
+  const body =
+    typeof input === 'string'
+      ? { text: input.trim() }
+      : { text: input.map((s) => s.trim()).filter(Boolean).join(' ') };
 
   const { response, data } = await fetchJson<ResolveSymptomsResult & { error?: string }>(
     `${API_BASE_URL}/symptoms/resolve-english`,
@@ -109,7 +114,7 @@ export const resolveSymptomsToEnglish = async (
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ symptoms: rawSymptoms }),
+      body: JSON.stringify(body),
     }
   );
 

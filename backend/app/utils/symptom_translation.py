@@ -122,6 +122,161 @@ ROMAN_URDU_SYMPTOM_MAP = {
 
 URDU_CHAR_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]")
 
+# English symptom phrases from the training dataset (supports voice: "headache fever")
+COMMON_ENGLISH_SYMPTOMS = frozenset(
+    {
+        "fatigue",
+        "vomiting",
+        "high fever",
+        "loss of appetite",
+        "nausea",
+        "headache",
+        "abdominal pain",
+        "yellowish skin",
+        "yellowing of eyes",
+        "chills",
+        "skin rash",
+        "malaise",
+        "chest pain",
+        "joint pain",
+        "itching",
+        "sweating",
+        "dark urine",
+        "cough",
+        "diarrhoea",
+        "irritability",
+        "muscle pain",
+        "excessive hunger",
+        "weight loss",
+        "lethargy",
+        "breathlessness",
+        "mild fever",
+        "phlegm",
+        "swelled lymph nodes",
+        "blurred and distorted vision",
+        "loss of balance",
+        "dizziness",
+        "abnormal menstruation",
+        "depression",
+        "red spots over body",
+        "fast heart rate",
+        "muscle weakness",
+        "restlessness",
+        "obesity",
+        "family history",
+        "stiff neck",
+        "indigestion",
+        "back pain",
+        "constipation",
+        "fever",
+        "runny nose",
+        "continuous sneezing",
+        "throat irritation",
+        "redness of eyes",
+        "sinus pressure",
+        "congestion",
+    }
+)
+
+_SEGMENT_VOCABULARY: list[str] | None = None
+
+
+def _get_segment_vocabulary() -> list[str]:
+    """Phrases longest-first for greedy voice / free-text splitting."""
+    global _SEGMENT_VOCABULARY
+    if _SEGMENT_VOCABULARY is not None:
+        return _SEGMENT_VOCABULARY
+
+    phrases: set[str] = set(COMMON_ENGLISH_SYMPTOMS)
+    phrases.update(_clean_english_phrase(v) for v in URDU_SCRIPT_SYMPTOM_MAP.values())
+    phrases.update(_clean_english_phrase(v) for v in ROMAN_URDU_SYMPTOM_MAP.values())
+    phrases.update(URDU_SCRIPT_SYMPTOM_MAP.keys())
+    phrases.update(ROMAN_URDU_SYMPTOM_MAP.keys())
+    phrases.discard("")
+
+    _SEGMENT_VOCABULARY = sorted(
+        phrases,
+        key=lambda p: (len(p.split()), len(p)),
+        reverse=True,
+    )
+    return _SEGMENT_VOCABULARY
+
+
+def _phrase_in_vocabulary(candidate: str) -> bool:
+    key = _lookup_key(candidate)
+    if not key:
+        return False
+    if key in URDU_SCRIPT_SYMPTOM_MAP or key in ROMAN_URDU_SYMPTOM_MAP:
+        return True
+    if key in COMMON_ENGLISH_SYMPTOMS:
+        return True
+    return False
+
+
+def _segment_phrase_greedy(phrase: str) -> List[str]:
+    """Split space-separated speech like 'headache fever' or 'high fever headache'."""
+    normalized = _lookup_key(phrase)
+    if not normalized:
+        return []
+
+    if _phrase_in_vocabulary(normalized):
+        return [normalized]
+
+    words = normalized.split()
+    if len(words) <= 1:
+        return [normalized]
+
+    result: List[str] = []
+    i = 0
+    while i < len(words):
+        matched: str | None = None
+        for j in range(len(words), i, -1):
+            candidate = " ".join(words[i:j])
+            if _phrase_in_vocabulary(candidate):
+                matched = candidate
+                i = j
+                break
+        if matched:
+            result.append(matched)
+        else:
+            result.append(words[i])
+            i += 1
+    return result
+
+
+def split_user_symptom_text(text: str) -> List[str]:
+    """
+    Split typed or spoken free text into individual symptom phrases.
+    Commas separate symptoms; spaces use longest-match against known phrases.
+    """
+    if not text or not str(text).strip():
+        return []
+
+    parts: List[str] = []
+    for chunk in re.split(r"[,;]+", str(text)):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        parts.extend(_segment_phrase_greedy(chunk))
+    return parts
+
+
+def collect_raw_symptom_inputs(data: dict) -> List[str]:
+    """Accept { text: \"headache fever\" } or { symptoms: [\"a\", \"b\"] }."""
+    text = data.get("text")
+    if isinstance(text, str) and text.strip():
+        return split_user_symptom_text(text)
+
+    raw_symptoms = data.get("symptoms")
+    if isinstance(raw_symptoms, list):
+        expanded: List[str] = []
+        for item in raw_symptoms:
+            if isinstance(item, str) and item.strip():
+                expanded.extend(split_user_symptom_text(item))
+        return expanded
+
+    return []
+
 
 def contains_urdu_script(text: str) -> bool:
     return bool(URDU_CHAR_RE.search(text or ""))

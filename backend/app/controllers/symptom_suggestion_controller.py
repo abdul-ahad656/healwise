@@ -6,7 +6,7 @@ from app.services.symptom_suggestion_service import (
     SymptomSuggestionError,
     suggest_symptoms,
 )
-from app.utils.symptom_translation import resolve_symptoms_to_english
+from app.utils.symptom_translation import collect_raw_symptom_inputs, resolve_symptoms_to_english
 
 
 def resolve_symptoms_handler():
@@ -14,20 +14,12 @@ def resolve_symptoms_handler():
         return jsonify({"error": "Content-Type must be application/json"}), 400
 
     data = request.get_json(silent=True) or {}
-    raw_symptoms = data.get("symptoms")
+    raw_parts = collect_raw_symptom_inputs(data)
 
-    if raw_symptoms is None:
-        return jsonify({"error": "symptoms is required"}), 400
+    if not raw_parts:
+        return jsonify({"error": "Provide text or symptoms (at least one required)"}), 400
 
-    if not isinstance(raw_symptoms, list):
-        return jsonify({"error": "symptoms must be an array"}), 400
-
-    if not any(isinstance(s, str) and s.strip() for s in raw_symptoms):
-        return jsonify({"error": "At least one symptom is required"}), 400
-
-    mappings = resolve_symptoms_to_english(
-        str(s) for s in raw_symptoms if isinstance(s, str)
-    )
+    mappings = resolve_symptoms_to_english(raw_parts)
     if not mappings:
         return jsonify({"error": "Could not recognize any symptoms. Try common Urdu or English terms."}), 400
 
@@ -45,17 +37,12 @@ def suggest_symptoms_handler():
         return jsonify({"error": "Content-Type must be application/json"}), 400
 
     data = request.get_json(silent=True) or {}
-    raw_symptoms = data.get("symptoms")
+    raw_parts = collect_raw_symptom_inputs(data)
 
-    if raw_symptoms is None:
-        return jsonify({"error": "symptoms is required"}), 400
+    if not raw_parts:
+        return jsonify({"error": "Provide text or symptoms (at least one required)"}), 400
 
-    if not isinstance(raw_symptoms, list):
-        return jsonify({"error": "symptoms must be an array"}), 400
-
-    mappings = resolve_symptoms_to_english(
-        str(s) for s in raw_symptoms if isinstance(s, str)
-    )
+    mappings = resolve_symptoms_to_english(raw_parts)
     normalized = [item["token"] for item in mappings]
     if not normalized:
         return jsonify({"error": "Could not recognize any symptoms. Try common Urdu or English terms."}), 400

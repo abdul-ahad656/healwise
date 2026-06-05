@@ -68,20 +68,6 @@ export default function DoctorConsultation() {
         contentContainerStyle={ps.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.statsGrid}>
-          <Card style={[styles.statCard, { backgroundColor: '#f5f3ff' }]}>
-            <Text style={styles.statValue}>1000+</Text>
-            <Text style={styles.statLabel}>{t("doctor_stats_doctors")}</Text>
-          </Card>
-          <Card style={[styles.statCard, { backgroundColor: '#f0fdf4' }]}>
-            <Text style={styles.statValue}>24/7</Text>
-            <Text style={styles.statLabel}>{t("doctor_stats_available")}</Text>
-          </Card>
-          <Card style={[styles.statCard, { backgroundColor: '#eff6ff' }]}>
-            <Text style={styles.statValue}>4.8★</Text>
-            <Text style={styles.statLabel}>{t("doctor_stats_rating")}</Text>
-          </Card>
-        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t("doctor_available_title")}</Text>
