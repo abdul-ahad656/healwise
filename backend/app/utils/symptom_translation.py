@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Iterable, List
 
+from app.utils.symptom_vocabulary import is_known_symptom, is_segment_stop_word
 from app.utils.translate_utils import translate_to_english
 from app.utils.symptom_normalization import normalize_symptom
 
@@ -178,30 +179,6 @@ COMMON_ENGLISH_SYMPTOMS = frozenset(
     }
 )
 
-_SEGMENT_VOCABULARY: list[str] | None = None
-
-
-def _get_segment_vocabulary() -> list[str]:
-    """Phrases longest-first for greedy voice / free-text splitting."""
-    global _SEGMENT_VOCABULARY
-    if _SEGMENT_VOCABULARY is not None:
-        return _SEGMENT_VOCABULARY
-
-    phrases: set[str] = set(COMMON_ENGLISH_SYMPTOMS)
-    phrases.update(_clean_english_phrase(v) for v in URDU_SCRIPT_SYMPTOM_MAP.values())
-    phrases.update(_clean_english_phrase(v) for v in ROMAN_URDU_SYMPTOM_MAP.values())
-    phrases.update(URDU_SCRIPT_SYMPTOM_MAP.keys())
-    phrases.update(ROMAN_URDU_SYMPTOM_MAP.keys())
-    phrases.discard("")
-
-    _SEGMENT_VOCABULARY = sorted(
-        phrases,
-        key=lambda p: (len(p.split()), len(p)),
-        reverse=True,
-    )
-    return _SEGMENT_VOCABULARY
-
-
 def _phrase_in_vocabulary(candidate: str) -> bool:
     key = _lookup_key(candidate)
     if not key:
@@ -210,7 +187,7 @@ def _phrase_in_vocabulary(candidate: str) -> bool:
         return True
     if key in COMMON_ENGLISH_SYMPTOMS:
         return True
-    return False
+    return is_known_symptom(key)
 
 
 def _segment_phrase_greedy(phrase: str) -> List[str]:
@@ -239,7 +216,9 @@ def _segment_phrase_greedy(phrase: str) -> List[str]:
         if matched:
             result.append(matched)
         else:
-            result.append(words[i])
+            word = words[i]
+            if _phrase_in_vocabulary(word) or not is_segment_stop_word(word):
+                result.append(word)
             i += 1
     return result
 
@@ -362,6 +341,15 @@ def resolve_symptoms_to_english(values: Iterable[str]) -> List[dict]:
         token = normalize_symptom(english)
         if not token or token in seen_tokens:
             continue
+
+        token_spaced = token.replace("_", " ")
+        if not _phrase_in_vocabulary(token_spaced) and not _phrase_in_vocabulary(english):
+            mapped = _map_static(raw)
+            if mapped and _phrase_in_vocabulary(mapped):
+                english = _clean_english_phrase(mapped)
+                token = normalize_symptom(english)
+            else:
+                continue
 
         seen_tokens.add(token)
         results.append(

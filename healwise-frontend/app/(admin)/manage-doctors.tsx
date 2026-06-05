@@ -54,7 +54,6 @@ const EMPTY_FORM: CreateDoctorPayload = {
   name: '',
   email: '',
   password: '',
-  language: 'en',
   specialization: '',
   experience: '',
   hospital: '',
@@ -150,7 +149,6 @@ export default function ManageDoctorsScreen() {
         const updatePayload: Partial<CreateDoctorPayload> = {
           name: form.name.trim(),
           email: normalizedEmail,
-          language: form.language,
           specialization: form.specialization || undefined,
           experience: form.experience || undefined,
           hospital: form.hospital || undefined,
@@ -202,7 +200,6 @@ export default function ManageDoctorsScreen() {
       name: doctor.name,
       email: doctor.email,
       password: '',
-      language: doctor.language || 'en',
       specialization: doctor.specialization || '',
       experience: doctor.experience || '',
       hospital: doctor.hospital || '',
@@ -305,17 +302,6 @@ export default function ManageDoctorsScreen() {
               value={form.password}
               onChangeText={(text) =>
                 setForm((f) => ({ ...f, password: text }))
-              }
-            />
-          </Field>
-          <Field label="Language">
-            <TextInput
-              style={s.input}
-              placeholder="en or ur"
-              placeholderTextColor={PLACEHOLDER_COLOR}
-              value={form.language}
-              onChangeText={(text) =>
-                setForm((f) => ({ ...f, language: text }))
               }
             />
           </Field>

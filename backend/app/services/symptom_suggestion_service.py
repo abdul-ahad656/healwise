@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import random
 from collections import Counter
 from typing import Any
 
@@ -18,6 +19,7 @@ from app.utils.symptom_normalization import (
 logger = logging.getLogger(__name__)
 
 MAX_SUGGESTIONS = 10
+SUGGESTION_POOL_SIZE = 40
 
 
 class SymptomSuggestionError(Exception):
@@ -37,6 +39,38 @@ def ensure_disease_symptoms_indexes() -> None:
         collection.create_index("symptoms")
     except PyMongoError as exc:
         logger.warning("disease_symptoms index warning: %s", exc)
+
+    try:
+        from app.utils.symptom_vocabulary import refresh_symptom_vocabulary
+
+        refresh_symptom_vocabulary()
+    except Exception as exc:
+        logger.debug("Symptom vocabulary refresh skipped: %s", exc)
+
+
+def _pick_diverse_suggestions(counter: Counter[str], limit: int = MAX_SUGGESTIONS) -> list[str]:
+    """Weighted random sample so co-occurring symptoms vary between requests."""
+    if not counter:
+        return []
+
+    ranked = counter.most_common()
+    if len(ranked) <= limit:
+        return [name for name, _ in ranked]
+
+    pool = ranked[:SUGGESTION_POOL_SIZE]
+    names = [name for name, _ in pool]
+    weights = [float(count) for _, count in pool]
+
+    chosen: list[str] = []
+    remaining_names = names[:]
+    remaining_weights = weights[:]
+
+    for _ in range(min(limit, len(remaining_names))):
+        index = random.choices(range(len(remaining_names)), weights=remaining_weights, k=1)[0]
+        chosen.append(remaining_names.pop(index))
+        remaining_weights.pop(index)
+
+    return chosen
 
 
 def suggest_symptoms(selected: list[str]) -> dict[str, Any]:
@@ -72,7 +106,7 @@ def suggest_symptoms(selected: list[str]) -> dict[str, Any]:
             if s and s not in selected_set:
                 counter[s] += 1
 
-    suggestions = [name for name, _ in counter.most_common(MAX_SUGGESTIONS)]
+    suggestions = _pick_diverse_suggestions(counter, MAX_SUGGESTIONS)
 
     return {
         "selected_symptoms": normalized,
