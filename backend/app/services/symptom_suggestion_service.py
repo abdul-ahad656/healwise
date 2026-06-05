@@ -17,6 +17,8 @@ from app.utils.symptom_normalization import (
 
 logger = logging.getLogger(__name__)
 
+MAX_SUGGESTIONS = 10
+
 
 class SymptomSuggestionError(Exception):
     """Raised when suggestion lookup fails."""
@@ -40,7 +42,7 @@ def ensure_disease_symptoms_indexes() -> None:
 def suggest_symptoms(selected: list[str]) -> dict[str, Any]:
     """
     Find diseases whose symptom sets contain all selected symptoms,
-    then return the top 3 most frequent remaining symptoms.
+    then return the most frequent remaining symptoms (up to MAX_SUGGESTIONS).
     """
     normalized = normalize_symptoms_list(selected)
     if not normalized:
@@ -70,7 +72,7 @@ def suggest_symptoms(selected: list[str]) -> dict[str, Any]:
             if s and s not in selected_set:
                 counter[s] += 1
 
-    suggestions = [name for name, _ in counter.most_common(3)]
+    suggestions = [name for name, _ in counter.most_common(MAX_SUGGESTIONS)]
 
     return {
         "selected_symptoms": normalized,

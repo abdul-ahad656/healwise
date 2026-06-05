@@ -18,7 +18,7 @@ import { PatientScreenHeader } from '@/components/patient/PatientScreenHeader';
 import {
   analyzeSymptoms,
   suggestSymptoms,
-  normalizeSymptomToken,
+  parseSymptomInput,
   formatSymptomLabel,
 } from '@/services/symptomService';
 import {
@@ -69,17 +69,18 @@ export default function SymptomChecker() {
 
   const handleAddSymptom = useCallback(
     async (raw: string) => {
-      const normalized = normalizeSymptomToken(raw);
-      if (!normalized) return;
+      const tokens = parseSymptomInput(raw);
+      if (tokens.length === 0) return;
 
-      if (selectedSymptoms.includes(normalized)) {
+      const newcomers = tokens.filter((token) => !selectedSymptoms.includes(token));
+      if (newcomers.length === 0) {
         setError(t('symptom_duplicate'));
         return;
       }
 
       setError(null);
       setSymptomInput('');
-      const updated = [...selectedSymptoms, normalized];
+      const updated = [...selectedSymptoms, ...newcomers];
       setSelectedSymptoms(updated);
       await fetchSuggestions(updated);
     },

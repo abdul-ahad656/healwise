@@ -8,6 +8,20 @@ export function normalizeSymptomToken(value: string): string {
   return s.replace(/ /g, '_');
 }
 
+/** Split comma-separated input into individual normalized symptom tokens. */
+export function parseSymptomInput(value: string): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const part of value.split(',')) {
+    const token = normalizeSymptomToken(part);
+    if (token && !seen.has(token)) {
+      seen.add(token);
+      result.push(token);
+    }
+  }
+  return result;
+}
+
 export function formatSymptomLabel(value: string): string {
   return value.replace(/_/g, ' ');
 }
